@@ -1,0 +1,36 @@
+﻿@using Scorebini.Data
+
+@if (Comm != null)
+{
+<p>
+    <label>
+        Commentator @(Index + 1):
+        <input @bind-value="Comm.Name" placeholder="Name" />
+        <input @bind-value="Comm.Handle" placeholder="Handle" />
+    </label>
+    <div>
+        <button class="btn btn-info" @onclick="@(async () => { await UpClicked.InvokeAsync(Index); })">&uarr;</button>
+        <button class="btn btn-info" @onclick="@(async () => { await DownClicked.InvokeAsync(Index); })">&darr;</button>
+    </div>
+    <div>
+        <button class="btn btn-danger" @onclick="@(async () => { await DeleteClicked.InvokeAsync(Index); })">&times;</button>
+    </div>
+</p>
+}
+
+@code {
+
+    [Parameter]
+    public Commentator Comm { get; set; }
+    [Parameter]
+    public int Index { get; set; }
+    // Callback input is the Index parameter
+    [Parameter]
+    public EventCallback<int> UpClicked { get; set; }
+    // Callback input is the Index parameter
+    [Parameter]
+    public EventCallback<int> DownClicked { get; set; }
+    // Callback input is the Index parameter
+    [Parameter]
+    public EventCallback<int> DeleteClicked { get; set; }
+}

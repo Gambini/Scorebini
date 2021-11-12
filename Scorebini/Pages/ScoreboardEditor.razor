@@ -1,0 +1,286 @@
+﻿@page "/scoreboard"
+@using Scorebini.Data
+@using Microsoft.Extensions.Logging
+@inject TournamentService TournamentSvc 
+@inject ScoreboardSettingsService SettingsSvc
+@inject CommentatorService CommentatorSvc
+@inject ILogger<ScoreboardEditor> Log
+@implements IDisposable
+
+<h3>ScoreboardEditor</h3>
+<p>
+    <label>
+        Challonge URL
+        <input @bind="InputState.ChallongeUrl" />
+    </label>
+    <button class="btn btn-primary" @onclick="(async () => await UpdateContext())" disabled="@DisableUpdateButton">
+        Pull
+    </button>
+    @if(ContextUpdateErrors != null && ContextUpdateErrors.Count > 0)
+    {
+        foreach(var errStr in ContextUpdateErrors)
+        {
+            <p class="text-danger">@errStr</p>
+        }
+    }
+</p>
+
+@if(Tournament != null)
+{
+
+    <div>
+        <label>
+            Player 1:
+            <select value="@InputState.Player1.Name" @onchange="Player1InputChanged">
+                <optgroup label="Next Matches">
+                    @foreach(var match in TournamentSvc.GetPendingMatches(Tournament))
+                    {
+                        <option value="__id__@match.Id">@match.Player1.Name / @match.Player2.Name</option>
+                    }
+                </optgroup>
+                <optgroup label="All Players">
+                    @foreach(var participant in TournamentSvc.ParticipantAutocompleteList(InputState.Player1.Name, Tournament))
+                    {
+                        <option value="@participant.Name">@participant.Name</option>
+                    }
+                </optgroup>
+            </select>
+        </label>
+        <label>
+            Player 2:
+            <select value="@InputState.Player2.Name" @onchange="Player2InputChanged">
+                <optgroup label="Next Matches">
+                    @foreach(var match in TournamentSvc.GetPendingMatches(Tournament))
+                    {
+                        <option value="__id__@match.Id">@match.Player1.Name / @match.Player2.Name</option>
+                    }
+                </optgroup>
+                <optgroup label="All Players">
+                    @foreach(var participant in TournamentSvc.ParticipantAutocompleteList(InputState.Player2.Name, Tournament))
+                    {
+                        <option value="@participant.Name">@participant.Name</option>
+                    }
+                </optgroup>
+            </select>
+        </label>
+    </div>
+    <button class="btn btn-primary" @onclick="UpdateScoreboardButtonClicked">Update Scoreboard</button>
+}
+@if (Commentators != null)
+{
+    <p>
+        <h3>Commentators:</h3>
+    </p>
+    <div>
+        @for(int i = 0; i < InputState.Commentators.Count; i++)
+        {
+            var comm = InputState.Commentators[i];
+            int idx = i;
+            <CommentatorListItem 
+                                 Comm=@comm 
+                                 Index=@idx
+                                 UpClicked="@CommentatorUpBtnClicked"
+                                 DownClicked="@CommentatorDownBtnClicked"
+                                 DeleteClicked="@CommentatorDeleteBtnClicked"
+                                 />
+        }
+        <button class="btn btn-secondary" @onclick="AddCommentatorButtonClicked">
+            +
+        </button>
+    </div>
+}
+
+
+@code {
+
+        ScoreboardInputState InputState = new();
+
+        bool _isUpdatingContext = false;
+        bool DisableUpdateButton => string.IsNullOrWhiteSpace(InputState.ChallongeUrl) || _isUpdatingContext;
+        List<string> ContextUpdateErrors = null;
+
+        TournamentView Tournament = null;
+        CommentatorList Commentators = null;
+
+    public List<Commentator> SelectedCommentators = new();
+
+    System.Timers.Timer UpdatePollTimer;
+    DateTime PrevUpdateTime;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        if(SettingsSvc.CurrentSettings == null)
+        {
+            SettingsSvc.LoadSettings();
+        }
+        InputState = SettingsSvc.LoadInputState();
+        Commentators = SettingsSvc.LoadCommentators();
+    }
+
+
+    public void Dispose()
+    {
+        Log.LogInformation("Disposing scoreboard editor page");
+        if (UpdatePollTimer != null)
+        {
+            UpdatePollTimer.Elapsed -= UpdatePollEventCallback;
+            UpdatePollTimer?.Dispose();
+        }
+    }
+
+    private async Task UpdateContext()
+    {
+        if (UpdatePollTimer == null)
+        {
+            Log.LogInformation("Initializing auto update timer");
+            // Init poll timer when the user first clicks the button
+            PrevUpdateTime = DateTime.UtcNow;
+            UpdatePollTimer = new System.Timers.Timer(1000.0); // tick every second
+            UpdatePollTimer.Elapsed += UpdatePollEventCallback;
+            UpdatePollTimer.Start();
+        }
+        _isUpdatingContext = true;
+        StateHasChanged(); // ensure button is disabled
+        SettingsSvc.SaveInputState(InputState);
+        var context = await TournamentSvc.InitForTournamentId(TournamentService.ExtractTournamentIdFromUrl(InputState.ChallongeUrl));
+        if(context == null || !context.IsValid)
+        {
+            Tournament = null;
+            ContextUpdateErrors = context?.RequestErrors;
+        }
+        else
+        {
+            Tournament = new TournamentView(context);
+            ContextUpdateErrors = null;
+        }
+        _isUpdatingContext = false;
+        PrevUpdateTime = DateTime.UtcNow;
+        StateHasChanged();
+    }
+
+
+    private async void UpdatePollEventCallback(object sender, System.Timers.ElapsedEventArgs args)
+    {
+        if (_isUpdatingContext) // don't stack up update calls
+            return;
+
+        int updateInterval = SettingsSvc.CurrentSettings?.UpdateIntervalSeconds ?? -1;
+        DateTime now = DateTime.UtcNow;
+        if ((updateInterval > 0) && ((now - PrevUpdateTime) > TimeSpan.FromSeconds(updateInterval)))
+        {
+            Log.LogInformation("Automatically pulling bracket update info.");
+            await InvokeAsync(async () => await UpdateContext());
+        }
+    }
+
+    private void UpdateScoreboardButtonClicked()
+    {
+        SettingsSvc.SaveInputState(InputState);
+        if(SettingsSvc.CurrentSettings == null)
+        {
+            SettingsSvc.LoadSettings();
+        }
+        SettingsSvc.WriteOutputFiles(SettingsSvc.CurrentSettings, InputState);
+    }
+
+
+    private void SetMatchFromSelection(string optionValue)
+    {
+        string idStr = optionValue.Substring("__id__".Length);
+        if(long.TryParse(idStr, out long matchId))
+        {
+            if(Tournament.Matches.TryGetValue(matchId, out var match))
+            {
+                if(match.Player1 != null)
+                {
+                    InputState.Player1.Name = match.Player1.Name;
+                }
+                if(match.Player2 != null)
+                {
+                    InputState.Player2.Name = match.Player2.Name;
+                }
+            }
+        }
+    }
+
+    private void Player1InputChanged(ChangeEventArgs e)
+    {
+        string val = e.Value as string;
+        if(!string.IsNullOrWhiteSpace(val) && val.StartsWith("__id__"))
+        {
+            SetMatchFromSelection(val);
+        }
+        else
+        {
+            InputState.Player1.Name = e.Value as string;
+        }
+        StateHasChanged();
+    }
+
+    private void Player2InputChanged(ChangeEventArgs e)
+    {
+        string val = e.Value as string;
+        if(!string.IsNullOrWhiteSpace(val) && val.StartsWith("__id__"))
+        {
+            SetMatchFromSelection(val);
+        }
+        else
+        {
+            InputState.Player2.Name = e.Value as string;
+        }
+    }
+
+
+    private void AddCommentatorButtonClicked()
+    {
+        InputState.Commentators.Add(new Commentator());
+    }
+
+    private void CommentatorUpBtnClicked(int idx)
+    {
+        if (idx == 0)
+        {
+            Log.LogInformation($"btn up idx == 0 (idx = {idx})");
+            return;
+        }
+        if (idx >= InputState.Commentators.Count)
+        {
+            Log.LogInformation($"btn up idx >= InputState.Commentators.Count  (idx = {idx} Count = {InputState.Commentators.Count})");
+            return;
+        }
+        if (InputState.Commentators.Count == 1)
+        {
+            Log.LogInformation($"btn up (InputState.Commentators.Count == 1) (Count = {InputState.Commentators.Count})");
+            return;
+        }
+
+        var prev = InputState.Commentators[idx-1];
+        InputState.Commentators[idx - 1] = InputState.Commentators[idx];
+        InputState.Commentators[idx] = prev;
+    }
+
+    private void CommentatorDownBtnClicked(int idx)
+    {
+        if ((idx + 1) >= (InputState.Commentators.Count))
+        {
+            Log.LogInformation($"btn down ((idx + 1) >= InputState.Commentators.Count) (idx = {idx} Count = {InputState.Commentators.Count})");
+            return;
+        }
+        if (InputState.Commentators.Count == 1)
+        {
+            Log.LogInformation($"btn down (InputState.Commentators.Count == 1)) (Count = {InputState.Commentators.Count})");
+            return;
+        }
+
+        var next = InputState.Commentators[idx + 1];
+        InputState.Commentators[idx + 1] = InputState.Commentators[idx];
+        InputState.Commentators[idx] = next;
+    }
+
+    private void CommentatorDeleteBtnClicked(int idx)
+    {
+        InputState.Commentators.RemoveAt(idx);
+    }
+
+}

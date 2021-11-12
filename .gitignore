@@ -1,0 +1,10 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/Scorebini/.config
+/Scorebini/bin
+/Scorebini/obj
+/Scorebini/output
+/Scorebini/ScoreboardSettings.json
+/Scorebini/ScoreboardInputState.json

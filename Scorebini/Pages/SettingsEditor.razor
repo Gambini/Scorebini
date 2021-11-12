@@ -1,0 +1,63 @@
+﻿@page "/"
+@page "/settings"
+
+@using Scorebini.Data
+@inject ScoreboardSettingsService SBSettingsService 
+
+<h1>SettingsEditor</h1>
+
+@if(!LoadResult.HasValue)
+{
+    <p><em>Loading...</em></p>
+}
+else if(LoadResult == false)
+{
+    <p><em>Error loading settings.</em></p>
+}
+else
+{ 
+    <p>
+        <label>
+            Challonge Api Key
+            <input @bind="SBSettings.ChallongeApiKey" />
+        </label>
+        <a href="https://challonge.com/settings/developer" class="small" target="_blank">Challonge Settings</a>
+    </p>
+    <p>
+        <label>
+            Output Directory
+            <input @bind="SBSettings.OutputDirectory" />
+        </label>
+        <h5 class="small">@System.IO.Path.GetFullPath(SBSettings.OutputDirectory)</h5>
+    </p>
+    <p>
+        <label>
+            Update Interval (seconds)
+            <input @bind="SBSettings.UpdateIntervalSeconds" />
+        </label>
+    </p>
+    <button class="btn-primary" @onclick="SaveSettings">
+        Save
+    </button>
+}
+
+@code {
+
+    ScoreboardSettings SBSettings = new();
+    private bool? LoadResult;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        LoadResult = SBSettingsService.LoadSettings();
+        if(LoadResult == true)
+        {
+            SBSettings = SBSettingsService.CurrentSettings;
+        }
+    }
+
+    private void SaveSettings()
+    {
+        SBSettingsService.SaveSettings(SBSettings);
+    }
+}
