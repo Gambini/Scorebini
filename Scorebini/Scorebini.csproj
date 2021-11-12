@@ -5,13 +5,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Remove="Config\ScoreboardSettings.json" />
     <Content Remove="ScoreboardInputState.json" />
     <Content Remove="ScoreboardSettings.json" />
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="ScoreboardInputState.json" />
-    <None Include="ScoreboardSettings.json" />
+    <None Include="Config\ScoreboardInputState.json" />
+    <None Include="Config\ScoreboardSettings.json" />
   </ItemGroup>
 
   <ItemGroup>

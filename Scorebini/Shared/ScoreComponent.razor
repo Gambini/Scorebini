@@ -1,0 +1,12 @@
+﻿
+<div style="display: inline-block">
+<input class="font-weight-bold" style="max-width: 2.5em; font-size: large" @bind-value="ScoreNumber" />
+<button class="btn btn-info py-1" @onclick="@(() => {ScoreNumber+=1;})">+</button>
+<button class="btn btn-info py-1" @onclick="@(() => {ScoreNumber-=1;})">-</button>
+</div>
+
+@code {
+
+    [Parameter]
+    public int ScoreNumber { get; set; }
+}

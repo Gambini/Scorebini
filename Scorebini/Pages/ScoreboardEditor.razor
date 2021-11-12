@@ -1,5 +1,6 @@
 ﻿@page "/scoreboard"
 @using Scorebini.Data
+@using Scorebini.Shared
 @using Microsoft.Extensions.Logging
 @inject TournamentService TournamentSvc 
 @inject ScoreboardSettingsService SettingsSvc
@@ -29,9 +30,12 @@
 {
 
     <div>
-        <label>
-            Player 1:
-            <select value="@InputState.Player1.Name" @onchange="Player1InputChanged">
+        <div class="mb-1">
+            <label for="player1_name">
+                Player 1:
+            </label>
+            <ScoreComponent @ref="ScorePlayer1" />
+            <select style="height: 2.5em" name="player1_name" value="@InputState.Player1.Name" @onchange="Player1InputChanged">
                 <optgroup label="Next Matches">
                     @foreach(var match in TournamentSvc.GetPendingMatches(Tournament))
                     {
@@ -45,10 +49,13 @@
                     }
                 </optgroup>
             </select>
-        </label>
-        <label>
-            Player 2:
-            <select value="@InputState.Player2.Name" @onchange="Player2InputChanged">
+        </div>
+        <div>
+            <label for="player2_name">
+                Player 2:
+            </label>
+            <ScoreComponent @ref="ScorePlayer2" />
+            <select style="height: 2.5em" name="player2_name" value="@InputState.Player2.Name" @onchange="Player2InputChanged">
                 <optgroup label="Next Matches">
                     @foreach(var match in TournamentSvc.GetPendingMatches(Tournament))
                     {
@@ -62,9 +69,9 @@
                     }
                 </optgroup>
             </select>
-        </label>
+        </div>
     </div>
-    <button class="btn btn-primary" @onclick="UpdateScoreboardButtonClicked">Update Scoreboard</button>
+    <button style="margin-top: 2em" class="btn btn-primary" @onclick="UpdateScoreboardButtonClicked">Update Scoreboard</button>
 }
 @if (Commentators != null)
 {
@@ -93,19 +100,22 @@
 
 @code {
 
-        ScoreboardInputState InputState = new();
+    ScoreboardInputState InputState = new();
 
-        bool _isUpdatingContext = false;
-        bool DisableUpdateButton => string.IsNullOrWhiteSpace(InputState.ChallongeUrl) || _isUpdatingContext;
-        List<string> ContextUpdateErrors = null;
+    bool _isUpdatingContext = false;
+    bool DisableUpdateButton => string.IsNullOrWhiteSpace(InputState.ChallongeUrl) || _isUpdatingContext;
+    List<string> ContextUpdateErrors = null;
 
-        TournamentView Tournament = null;
-        CommentatorList Commentators = null;
+    TournamentView Tournament = null;
+    CommentatorList Commentators = null;
 
     public List<Commentator> SelectedCommentators = new();
 
     System.Timers.Timer UpdatePollTimer;
     DateTime PrevUpdateTime;
+
+    ScoreComponent ScorePlayer1;
+    ScoreComponent ScorePlayer2;
 
     protected override void OnInitialized()
     {
@@ -176,6 +186,8 @@
 
     private void UpdateScoreboardButtonClicked()
     {
+        InputState.Player1.Score = ScorePlayer1.ScoreNumber;
+        InputState.Player2.Score = ScorePlayer2.ScoreNumber;
         SettingsSvc.SaveInputState(InputState);
         if(SettingsSvc.CurrentSettings == null)
         {

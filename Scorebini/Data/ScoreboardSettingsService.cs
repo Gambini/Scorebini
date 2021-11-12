@@ -11,8 +11,8 @@ namespace Scorebini.Data
     public class ScoreboardSettingsService
     {
         public ScoreboardSettings CurrentSettings { get; set; } = new ScoreboardSettings();
-        const string SettingsFilePath = @"ScoreboardSettings.json";
-        const string InputStateFilePath = @"ScoreboardInputState.json";
+        const string SettingsFilePath = @"Config/ScoreboardSettings.json";
+        const string InputStateFilePath = @"Config/ScoreboardInputState.json";
         const string CommentatorFilePath = @"ScoreboardCommentators.json"; // relative to output directory
         private readonly string FullSettingsFilePath;
         private readonly string FullInputStateFilePath;
@@ -67,6 +67,7 @@ namespace Scorebini.Data
             try
             {
                 Log?.LogInformation($"Saving settings to {FullSettingsFilePath}");
+                (new FileInfo(FullSettingsFilePath)).Directory?.Create();
                 string serialized = JsonConvert.SerializeObject(newSettings, Formatting.Indented);
                 File.WriteAllText(SettingsFilePath, serialized, System.Text.Encoding.UTF8);
                 Log?.LogInformation($"Saved");
@@ -122,6 +123,7 @@ namespace Scorebini.Data
             try
             {
                 Log?.LogInformation($"Saving input state to {FullInputStateFilePath}");
+                (new FileInfo(FullSettingsFilePath)).Directory?.Create();
                 string serialized = JsonConvert.SerializeObject(input, Formatting.None);
                 File.WriteAllText(InputStateFilePath, serialized, System.Text.Encoding.UTF8);
                 Log?.LogInformation($"Saved");
@@ -201,7 +203,9 @@ namespace Scorebini.Data
                 string outputDir = Path.GetFullPath(settings.OutputDirectory);
                 Directory.CreateDirectory(outputDir);
                 WriteToFile(outputDir, "Player1.txt", input.Player1?.Name ?? "");
+                WriteToFile(outputDir, "Player1Score.txt", input.Player1?.Score.ToString() ?? "");
                 WriteToFile(outputDir, "Player2.txt", input.Player2?.Name ?? "");
+                WriteToFile(outputDir, "Player2Score.txt", input.Player2?.Score.ToString() ?? "");
                 for(int i = 0; i < input.Commentators.Count; i++)
                 {
                     var comm = input.Commentators[i];
