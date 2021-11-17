@@ -5,6 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Remove="Config\ScoreboardInputState.json" />
     <Content Remove="Config\ScoreboardSettings.json" />
     <Content Remove="ScoreboardInputState.json" />
     <Content Remove="ScoreboardSettings.json" />

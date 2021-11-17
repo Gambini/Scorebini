@@ -9,4 +9,10 @@
 
     [Parameter]
     public int ScoreNumber { get; set; }
+
+    public void SetScore(int newScore)
+    {
+        ScoreNumber = newScore;
+        StateHasChanged();
+    }
 }

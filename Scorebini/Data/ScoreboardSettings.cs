@@ -8,7 +8,7 @@ namespace Scorebini.Data
     public class ScoreboardSettings
     {
         public string ChallongeApiKey { get; set; }
-        public string OutputDirectory { get; set; } = "/output";
+        public string OutputDirectory { get; set; } = "output";
         public int UpdateIntervalSeconds { get; set; } = 30;
     }
 }

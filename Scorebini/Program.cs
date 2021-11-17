@@ -20,6 +20,7 @@ namespace Scorebini
             Host.CreateDefaultBuilder(args)
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
+                    webBuilder.UseUrls("http://localhost:8289");
                     webBuilder.UseStartup<Startup>();
                 });
     }

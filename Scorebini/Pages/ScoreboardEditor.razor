@@ -15,6 +15,7 @@
         <input @bind="InputState.ChallongeUrl" />
     </label>
     <button class="btn btn-primary" @onclick="(async () => await UpdateContext())" disabled="@DisableUpdateButton">
+        <div class="oi oi-data-transfer-download" />
         Pull
     </button>
     @if(ContextUpdateErrors != null && ContextUpdateErrors.Count > 0)
@@ -71,7 +72,16 @@
             </select>
         </div>
     </div>
-    <button style="margin-top: 2em" class="btn btn-primary" @onclick="UpdateScoreboardButtonClicked">Update Scoreboard</button>
+    <div class="mt-1" />
+    <button class="btn btn-primary" @onclick="SwapPlayerButtonClicked">
+        <div class="oi oi-transfer transfer-btn-icon" />
+        Swap Players
+    </button>
+    <div class="mt-4" />
+    <button class="btn btn-primary" @onclick="UpdateScoreboardButtonClicked">
+        <div class="oi oi-pencil" />
+        Update Scoreboard
+    </button>
 }
 @if (Commentators != null)
 {
@@ -241,6 +251,18 @@
         {
             InputState.Player2.Name = e.Value as string;
         }
+        StateHasChanged();
+    }
+
+
+    private void SwapPlayerButtonClicked()
+    {
+        InputState.Player1.Score = ScorePlayer1.ScoreNumber;
+        InputState.Player2.Score = ScorePlayer2.ScoreNumber;
+        InputState.SwapPlayers();
+        ScorePlayer1.SetScore(InputState.Player1.Score);
+        ScorePlayer2.SetScore(InputState.Player2.Score);
+        StateHasChanged();
     }
 
 
