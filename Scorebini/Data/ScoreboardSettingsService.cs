@@ -206,6 +206,7 @@ namespace Scorebini.Data
                 WriteToFile(outputDir, "Player1Score.txt", input.Player1?.Score.ToString() ?? "");
                 WriteToFile(outputDir, "Player2.txt", input.Player2?.Name ?? "");
                 WriteToFile(outputDir, "Player2Score.txt", input.Player2?.Score.ToString() ?? "");
+                WriteToFile(outputDir, "RoundName.txt", input.RoundName);
                 for(int i = 0; i < input.Commentators.Count; i++)
                 {
                     var comm = input.Commentators[i];

@@ -77,6 +77,15 @@
         <div class="oi oi-transfer transfer-btn-icon" />
         Swap Players
     </button>
+    <div class="mt-1" />
+    <select style="height: 2.5em" name="round_name" value="@InputState.RoundName" @onchange="RoundNameInputChanged">
+        <optgroup label="All Matches">
+            @foreach(var name in TournamentSvc.GetAllMatchNames(Tournament))
+            {
+                <option value="@name">@name</option>
+            }
+        </optgroup>
+    </select>
     <div class="mt-4" />
     <button class="btn btn-primary" @onclick="UpdateScoreboardButtonClicked">
         <div class="oi oi-pencil" />
@@ -222,6 +231,7 @@
                 {
                     InputState.Player2.Name = match.Player2.Name;
                 }
+                InputState.RoundName = match.RoundName;
             }
         }
     }
@@ -251,6 +261,13 @@
         {
             InputState.Player2.Name = e.Value as string;
         }
+        StateHasChanged();
+    }
+
+    private void RoundNameInputChanged(ChangeEventArgs e)
+    {
+        string val = e.Value as string;
+        InputState.RoundName = val ?? "";
         StateHasChanged();
     }
 

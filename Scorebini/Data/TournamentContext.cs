@@ -10,6 +10,9 @@ namespace Scorebini.Data
         public string TournamentId { get; set; }
         public List<ChallongeParticipant> Participants { get; set; } = null;
         public List<ChallongeMatch> Matches { get; set; } = null;
+        public long MaxRoundWinners { get; set; } = 0; // will be positive
+        public long MaxRoundLosers { get; set; } = 0; // will be the smallest negative number
+
 
         public List<string> RequestErrors { get; set; } = new();
 
@@ -43,6 +46,9 @@ namespace Scorebini.Data
         public TournamentParticipant Player1 { get; set; } = null;
         public TournamentParticipant Player2 { get; set; } = null;
         public MatchStatus Status { get; set; } = MatchStatus.Unknown;
+        public string RoundName { get; set; } = "INVALID";
+        public long RoundNumber => Model.Round ?? 0;
+        public string Identifier => Model.Identifier;
 
 
         private static MatchStatus StatusFromString(string status)
@@ -74,7 +80,28 @@ namespace Scorebini.Data
             {
                 ret.Player2 = player2;
             }
+            ret.RoundName = GetRoundName(tournament, model.Round ?? 0);
             return ret;
+        }
+
+        public static string GetRoundName(TournamentView tournament, long round)
+        {
+            string sideName = round < 0 ? "Losers" : "Winners";
+            string roundName;
+            if (round == tournament.Model.MaxRoundWinners || round == tournament.Model.MaxRoundLosers)
+            {
+                roundName = "Finals";
+            }
+            else if(round == (tournament.Model.MaxRoundWinners -1) || round == (tournament.Model.MaxRoundLosers + 1))
+            {
+                roundName = "SemiFinals";
+            }
+            else
+            {
+                long absRound = Math.Abs(round);
+                roundName = "Round " + absRound;
+            }
+            return $"{sideName} {roundName}";
         }
     }
 

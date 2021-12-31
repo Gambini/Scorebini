@@ -48,6 +48,11 @@ namespace Scorebini.Data
                 ret.RequestErrors.AddRange(parts.RequestErrors);
                 var matches = await GetMatches(tournamentId);
                 ret.Matches = matches.Matches;
+                if(ret.Matches != null)
+                {
+                    ret.MaxRoundWinners = ret.Matches.Select(m => m.Round ?? 0).Max();
+                    ret.MaxRoundLosers = ret.Matches.Select(m => m.Round ?? 0).Min();
+                }
                 ret.RequestErrors.AddRange(matches.RequestErrors);
             }
             catch(Exception ex)
@@ -97,6 +102,14 @@ namespace Scorebini.Data
                 }
             }
             return ret;
+        }
+
+        public List<string> GetAllMatchNames(TournamentView tournament)
+        {
+            if (tournament == null)
+                return new List<string>();
+
+            return tournament.Matches.Values.OrderBy(m => m.RoundNumber).Select(m => m.RoundName).Distinct().ToList();
         }
 
         struct LevenshteinDistance
@@ -163,7 +176,7 @@ namespace Scorebini.Data
             if(response.IsSuccessStatusCode)
             {
                 string respContent = await response.Content.ReadAsStringAsync();
-                Log.LogInformation("Participant response: " + respContent);
+                Log.LogTrace("Participant response: " + respContent);
                 var participantResp = JsonConvert.DeserializeObject<IList<ParticipantResponse.ParticipantObject>>(respContent);
                 if(participantResp == null)
                 {

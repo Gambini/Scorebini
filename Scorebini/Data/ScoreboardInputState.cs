@@ -16,6 +16,7 @@ namespace Scorebini.Data
         public string ChallongeUrl { get; set; } = "";
         public ScoreboardPlayerState Player1 { get; set; } = new();
         public ScoreboardPlayerState Player2 { get; set; } = new();
+        public string RoundName { get; set; } = "";
 
         public List<Commentator> Commentators { get; set; } = new();
 
