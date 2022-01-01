@@ -88,11 +88,15 @@ namespace Scorebini.Data
         {
             string sideName = round < 0 ? "Losers" : "Winners";
             string roundName;
-            if (round == tournament.Model.MaxRoundWinners || round == tournament.Model.MaxRoundLosers)
+            if (round == tournament.Model.MaxRoundWinners)
+            {
+                return "Grand Finals";
+            }
+            else if(round == (tournament.Model.MaxRoundWinners - 1) || round == tournament.Model.MaxRoundLosers)
             {
                 roundName = "Finals";
             }
-            else if(round == (tournament.Model.MaxRoundWinners -1) || round == (tournament.Model.MaxRoundLosers + 1))
+            else if(round == (tournament.Model.MaxRoundWinners - 2) || round == (tournament.Model.MaxRoundLosers + 1))
             {
                 roundName = "SemiFinals";
             }
