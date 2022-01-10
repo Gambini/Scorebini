@@ -202,9 +202,9 @@ namespace Scorebini.Data
             {
                 string outputDir = Path.GetFullPath(settings.OutputDirectory);
                 Directory.CreateDirectory(outputDir);
-                WriteToFile(outputDir, "Player1.txt", input.Player1?.Name ?? "");
+                WriteToFile(outputDir, "Player1.txt", input.Player1?.FormatName() ?? "");
                 WriteToFile(outputDir, "Player1Score.txt", input.Player1?.Score.ToString() ?? "");
-                WriteToFile(outputDir, "Player2.txt", input.Player2?.Name ?? "");
+                WriteToFile(outputDir, "Player2.txt", input.Player2?.FormatName() ?? "");
                 WriteToFile(outputDir, "Player2Score.txt", input.Player2?.Score.ToString() ?? "");
                 WriteToFile(outputDir, "RoundName.txt", input.RoundName);
                 for(int i = 0; i < input.Commentators.Count; i++)

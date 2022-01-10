@@ -33,13 +33,14 @@ namespace Scorebini.Data
             return url.Substring(idx + 1);
         }
 
-        public async Task<TournamentContext> InitForTournamentId(string tournamentId)
+        public async Task<TournamentContext> InitForTournamentId(string url, string tournamentId)
         {
             SBSettingsService.LoadSettings();
             Log.LogInformation($"Init for tournament {tournamentId}");
 
 
             TournamentContext ret = new();
+            ret.Url = url;
             ret.TournamentId = tournamentId;
             try
             {

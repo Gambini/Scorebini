@@ -1,0 +1,49 @@
+﻿
+@using Microsoft.Extensions.Logging
+
+<div class="btn-group btn-group-sm btn-group-toggle wlt-main" data-toggle="buttons">
+    <label class="btn btn-secondary wlt-btn @ActiveString(Data.GrandFinalsPosition.Winners)">
+        <input type="checkbox" name="options" id="W" autocomplete="off"
+        checked="@(ActiveString(Data.GrandFinalsPosition.Winners)=="active")"
+        @oninput=@((e) => OnInputChanged(Data.GrandFinalsPosition.Winners,e))
+        />
+        W
+    </label>
+    <label class="btn btn-secondary wlt-btn @ActiveString(Data.GrandFinalsPosition.Losers)">
+        <input type="checkbox" name="options" id="L" autocomplete="off" 
+        checked="@(ActiveString(Data.GrandFinalsPosition.Losers)=="active")"
+        @oninput=@((e) => OnInputChanged(Data.GrandFinalsPosition.Losers,e))
+        />
+        L
+    </label>
+</div>
+
+@code {
+    [Parameter]
+    public Data.GrandFinalsPosition Position { get; set; } = Data.GrandFinalsPosition.None;
+
+    public string ActiveString(Data.GrandFinalsPosition pos)
+    {
+        if(Position == pos)
+        {
+            return "active";
+        }
+        return "";
+    }
+
+    public void OnInputChanged(Data.GrandFinalsPosition pos, ChangeEventArgs args)
+    {
+        bool val = (bool)args.Value;
+        if (val)
+        {
+            Position = pos;
+        }
+        else
+        {
+            Position = Data.GrandFinalsPosition.None;
+        }
+    }
+
+
+
+}

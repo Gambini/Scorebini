@@ -5,10 +5,42 @@ using System.Threading.Tasks;
 
 namespace Scorebini.Data
 {
+    public enum GrandFinalsPosition
+    {
+        None = 0,
+        Winners = 1,
+        Losers = 2
+    }
+
     public class ScoreboardPlayerState
     {
         public string Name { get; set; }
         public int Score { get; set; }
+        public GrandFinalsPosition GFPosition { get; set; } = GrandFinalsPosition.None;
+
+        public string FormatName()
+        {
+            if(GFPosition == GrandFinalsPosition.None)
+            {
+                return Name;
+            }
+            else
+            {
+                string pos = "";
+                switch (GFPosition)
+                {
+                    case GrandFinalsPosition.Winners:
+                        pos = " (W)";
+                        break;
+                    case GrandFinalsPosition.Losers:
+                        pos = " (L)";
+                        break;
+                    default:
+                        break;
+                }
+                return Name + pos;
+            }
+        }
     }
 
     public class ScoreboardInputState

@@ -7,6 +7,7 @@ namespace Scorebini.Data
 {
     public class TournamentContext
     {
+        public string Url { get; set; }
         public string TournamentId { get; set; }
         public List<ChallongeParticipant> Participants { get; set; } = null;
         public List<ChallongeMatch> Matches { get; set; } = null;
@@ -111,6 +112,7 @@ namespace Scorebini.Data
 
     public class TournamentView
     {
+        public string Url => Model.Url;
         public TournamentContext Model { get; set; }
         public string Id => Model.TournamentId;
         public Dictionary<long, TournamentParticipant> Participants { get; } = new();
