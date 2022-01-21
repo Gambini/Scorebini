@@ -5,19 +5,53 @@ using System.Threading.Tasks;
 
 namespace Scorebini.Data
 {
+    public enum TournamentElimType
+    {
+        SingleElim = 0,
+        DoubleElim,
+        RoundRobin
+    }
+
     public class TournamentContext
     {
         public string Url { get; set; }
         public string TournamentId { get; set; }
+        public ChallongeTournament Tournament { get; set; }
         public List<ChallongeParticipant> Participants { get; set; } = null;
         public List<ChallongeMatch> Matches { get; set; } = null;
         public long MaxRoundWinners { get; set; } = 0; // will be positive
         public long MaxRoundLosers { get; set; } = 0; // will be the smallest negative number
+        public TournamentElimType ElimType { get; set; } = TournamentElimType.DoubleElim;
 
 
         public List<string> RequestErrors { get; set; } = new();
 
         public bool IsValid => Participants != null && Matches != null;
+
+        public TournamentContext()
+        {
+        }
+
+        public TournamentContext(ChallongeTournament tournament)
+        {
+            Tournament = tournament;
+            Url = Tournament?.FullUrl;
+            TournamentId = Tournament?.UrlId;
+            Participants = Tournament?.Participants?.Select(p => p.Participant).Where(p => p != null).ToList();
+            Matches = Tournament?.Matches?.Select(m => m.Match).Where(m => m != null).ToList();
+            if(Matches != null)
+            {
+                MaxRoundWinners = Matches.Select(m => m.Round ?? 0).Max();
+                MaxRoundLosers = Matches.Select(m => m.Round ?? 0).Min();
+            }
+            ElimType = (Tournament?.TournamentType) switch
+            {
+                "single elimination" => TournamentElimType.SingleElim,
+                "double elimination" => TournamentElimType.DoubleElim,
+                "round robin" => TournamentElimType.RoundRobin,
+                _ => TournamentElimType.DoubleElim,// sure, why not default to double elim
+            };
+        }
     }
 
 
@@ -87,26 +121,54 @@ namespace Scorebini.Data
 
         public static string GetRoundName(TournamentView tournament, long round)
         {
-            string sideName = round < 0 ? "Losers" : "Winners";
-            string roundName;
-            if (round == tournament.Model.MaxRoundWinners)
+            if (tournament.Model.ElimType == TournamentElimType.DoubleElim)
             {
-                return "Grand Finals";
+                string sideName = round < 0 ? "Losers" : "Winners";
+                string roundName;
+                if (round == tournament.Model.MaxRoundWinners)
+                {
+                    return "Grand Finals";
+                }
+                else if (round == (tournament.Model.MaxRoundWinners - 1) || round == tournament.Model.MaxRoundLosers)
+                {
+                    roundName = "Finals";
+                }
+                else if (round == (tournament.Model.MaxRoundWinners - 2) || round == (tournament.Model.MaxRoundLosers + 1))
+                {
+                    roundName = "SemiFinals";
+                }
+                else
+                {
+                    long absRound = Math.Abs(round);
+                    roundName = "Round " + absRound;
+                }
+                return $"{sideName} {roundName}";
             }
-            else if(round == (tournament.Model.MaxRoundWinners - 1) || round == tournament.Model.MaxRoundLosers)
+            else if(tournament.Model.ElimType == TournamentElimType.SingleElim)
             {
-                roundName = "Finals";
+                string roundName;
+                if (round == tournament.Model.MaxRoundWinners)
+                {
+                    return "Grand Finals";
+                }
+                else if (round == (tournament.Model.MaxRoundWinners - 1))
+                {
+                    roundName = "Finals";
+                }
+                else if (round == (tournament.Model.MaxRoundWinners - 2))
+                {
+                    roundName = "SemiFinals";
+                }
+                else
+                {
+                    roundName = "Round " + round;
+                }
+                return roundName;
             }
-            else if(round == (tournament.Model.MaxRoundWinners - 2) || round == (tournament.Model.MaxRoundLosers + 1))
+            else // round robin or unknown
             {
-                roundName = "SemiFinals";
+                return $"Round {round}";
             }
-            else
-            {
-                long absRound = Math.Abs(round);
-                roundName = "Round " + absRound;
-            }
-            return $"{sideName} {roundName}";
         }
     }
 

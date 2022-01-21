@@ -40,27 +40,21 @@ namespace Scorebini.Data
 
 
             TournamentContext ret = new();
-            ret.Url = url;
-            ret.TournamentId = tournamentId;
             try
             {
-                var parts = await GetParticipants(tournamentId);
-                ret.Participants = parts.Participants;
-                ret.RequestErrors.AddRange(parts.RequestErrors);
-                var matches = await GetMatches(tournamentId);
-                ret.Matches = matches.Matches;
-                if(ret.Matches != null)
-                {
-                    ret.MaxRoundWinners = ret.Matches.Select(m => m.Round ?? 0).Max();
-                    ret.MaxRoundLosers = ret.Matches.Select(m => m.Round ?? 0).Min();
-                }
-                ret.RequestErrors.AddRange(matches.RequestErrors);
+                var tournament = await GetTournament(tournamentId);
+                ret = new TournamentContext(tournament.Tournament);
+                ret.RequestErrors.AddRange(tournament.RequestErrors);
             }
             catch(Exception ex)
             {
                 Log.LogError(ex, ex.Message);
                 ret.RequestErrors.Add(ex.Message);
             }
+            if (string.IsNullOrEmpty(ret.Url))
+                ret.Url = url;
+            if (string.IsNullOrEmpty(ret.TournamentId))
+                ret.TournamentId = tournamentId;
             return ret;
         }
 
@@ -238,6 +232,47 @@ namespace Scorebini.Data
             else
             {
                 string err = $"Matches response error code {response.StatusCode} ({(int)response.StatusCode})";
+                ret.RequestErrors.Add(err);
+                Log.LogError(err);
+                await Log422Errors(response);
+                return ret;
+            }
+        }
+
+        public class TournamentGetResponse
+        {
+            [JsonProperty("tournament")]
+            public ChallongeTournament Tournament { get; set; }
+            public List<string> RequestErrors = new();
+        }
+
+        public async Task<TournamentGetResponse> GetTournament(string tournamentId)
+        {
+            Log.LogDebug("Getting tournament");
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{TournamentsEndpoint}/{tournamentId}.json?api_key={SBSettingsService.CurrentSettings?.ChallongeApiKey}&include_participants=1&include_matches=1");
+
+            TournamentGetResponse ret = new();
+
+            using var client = HttpFactory.CreateClient();
+            using var response = await client.SendAsync(request);
+            if(response.IsSuccessStatusCode)
+            {
+                string respContent = await response.Content.ReadAsStringAsync();
+                Log.LogTrace("Tournament response: {}", respContent);
+                ret = JsonConvert.DeserializeObject<TournamentGetResponse>(respContent);
+                if(ret == null)
+                {
+                    string err = "Could not deserialize tournament response.";
+                    Log.LogError(err);
+                    ret = new();
+                    ret.RequestErrors.Add(err);
+                    return ret;
+                }
+                return ret;
+            }
+            else
+            {
+                string err = $"Tournament response error code {response.StatusCode} ({(int)response.StatusCode})";
                 ret.RequestErrors.Add(err);
                 Log.LogError(err);
                 await Log422Errors(response);
