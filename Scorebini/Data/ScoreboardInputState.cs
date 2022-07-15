@@ -45,7 +45,7 @@ namespace Scorebini.Data
 
     public class ScoreboardInputState
     {
-        public string ChallongeUrl { get; set; } = "";
+        public string Url { get; set; } = "";
         public ScoreboardPlayerState Player1 { get; set; } = new();
         public ScoreboardPlayerState Player2 { get; set; } = new();
         public string RoundName { get; set; } = "";

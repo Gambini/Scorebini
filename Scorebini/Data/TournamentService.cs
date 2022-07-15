@@ -5,6 +5,8 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using System.Net.Http;
 using Newtonsoft.Json;
+using System.Text.RegularExpressions;
+using System.Net.Http.Json;
 
 namespace Scorebini.Data
 {
@@ -26,25 +28,69 @@ namespace Scorebini.Data
         }
 
 
-        public static string ExtractTournamentIdFromUrl(string url)
+        public static string ExtractTournamentIdFromChallongeUrl(string url)
         {
             // todo: add subdomain
             int idx = url.LastIndexOf('/');
             return url.Substring(idx + 1);
         }
 
-        public async Task<TournamentContext> InitForTournamentId(string url, string tournamentId)
+
+        static string ExtractSlugFromSmashUrl(string url)
+        {
+            var match = Regex.Match(url, @"(tournament/[^/]*/event/[^/]*)");
+            if (match.Success && match.Groups.Count > 0)
+            {
+                return match.Groups[1].Value;
+            }
+            return null;
+        }
+
+        public async Task<TournamentContext> InitForTournamentUrl(string url)
         {
             SBSettingsService.LoadSettings();
-            Log.LogInformation($"Init for tournament {tournamentId}");
+            TournamentHost host = TournamentHost.Unknown;
+            string tournamentId = "";
+            if (url.Contains("challonge.com", StringComparison.OrdinalIgnoreCase))
+            {
+                host = TournamentHost.Challonge;
+                tournamentId = ExtractTournamentIdFromChallongeUrl(url);
+            }
+            else if(url.Contains("smash.gg", StringComparison.OrdinalIgnoreCase)
+                || url.Contains("start.gg", StringComparison.OrdinalIgnoreCase))
+            {
+                host = TournamentHost.Smash;
+                tournamentId = ExtractSlugFromSmashUrl(url);
+            }
+            Log.LogInformation($"Init for {host} tournament {tournamentId}");
 
 
             TournamentContext ret = new();
             try
             {
-                var tournament = await GetTournament(tournamentId);
-                ret = new TournamentContext(tournament.Tournament);
-                ret.RequestErrors.AddRange(tournament.RequestErrors);
+                if (host == TournamentHost.Challonge)
+                {
+                    var tournament = await GetChallongeTournament(tournamentId);
+                    ret = new TournamentContext(tournament.Tournament);
+                    ret.RequestErrors.AddRange(tournament.RequestErrors);
+                }
+                else if (host == TournamentHost.Smash)
+                {
+                    if (tournamentId == null)
+                    {
+                        ret.RequestErrors.Add("Invalid Start.gg url. Expects 'tournament/*/event/*' in url.");
+                    }
+                    else
+                    {
+                        var tournament = await GetSmashggTournament(tournamentId);
+                        ret = new TournamentContext(tournament.Data?.Event, url, tournamentId);
+                        ret.RequestErrors.AddRange(tournament.RequestErrors);
+                    }
+                }
+                else
+                {
+                    ret.RequestErrors.Add("Could not parse challonge or start.gg url.");
+                }
             }
             catch(Exception ex)
             {
@@ -53,14 +99,17 @@ namespace Scorebini.Data
             }
             if (string.IsNullOrEmpty(ret.Url))
                 ret.Url = url;
+            if (ret.TournamentHost == TournamentHost.Unknown)
+                ret.TournamentHost = host;
             if (string.IsNullOrEmpty(ret.TournamentId))
                 ret.TournamentId = tournamentId;
+
             return ret;
         }
 
-        public List<TournamentParticipant> GetPendingOpponents(TournamentParticipant participant, TournamentView tournament)
+        public List<ITournamentParticipant> GetPendingOpponents(ITournamentParticipant participant, TournamentView tournament)
         {
-            var ret = new List<TournamentParticipant>();
+            var ret = new List<ITournamentParticipant>();
             if (participant == null || tournament == null)
                 return ret;
 
@@ -81,15 +130,18 @@ namespace Scorebini.Data
             return ret;
         }
 
-        public List<TournamentMatch> GetPendingMatches(TournamentView tournament)
+        public List<ITournamentMatch> GetPendingMatches(TournamentView tournament)
         {
-            var ret = new List<TournamentMatch>();
+            var ret = new List<ITournamentMatch>();
             if (tournament == null)
                 return ret;
 
             foreach(var pair in tournament.Matches)
             {
-                if(pair.Value.Status == MatchStatus.Open
+                // Challonge reports them as Open, where Smash.gg reports them as pending.
+                // As long as it isn't Complete or Unknown and there are two players, assume
+                // that it is a pending match.
+                if((pair.Value.Status == MatchStatus.Open || pair.Value.Status == MatchStatus.Pending)
                     && pair.Value.Player1 != null
                     && pair.Value.Player2 != null)
                 {
@@ -110,10 +162,10 @@ namespace Scorebini.Data
         struct LevenshteinDistance
         {
             public int Distance;
-            public TournamentParticipant Participant;
+            public ITournamentParticipant Participant;
         }
 
-        public List<TournamentParticipant> ParticipantAutocompleteList(string input, TournamentView tournament)
+        public List<ITournamentParticipant> ParticipantAutocompleteList(string input, TournamentView tournament)
         {
             if(string.IsNullOrWhiteSpace(input))
             {
@@ -129,7 +181,7 @@ namespace Scorebini.Data
         }
 
 
-        public TournamentParticipant FindParticipant(string name, TournamentView tournament)
+        public ITournamentParticipant FindParticipant(string name, TournamentView tournament)
         {
             if (name == null)
                 return null;
@@ -145,100 +197,6 @@ namespace Scorebini.Data
             return null;
         }
 
-
-        public class ParticipantResponse
-        {
-            public class ParticipantObject
-            {
-                [JsonProperty("participant")]
-                public ChallongeParticipant Participant { get; set; }
-            }
-
-
-            public List<ChallongeParticipant> Participants { get; set; }
-            public List<string> RequestErrors = new();
-        }
-
-        public async Task<ParticipantResponse> GetParticipants(string tournamentId)
-        {
-            Log.LogDebug($"Getting participants");
-
-
-            ParticipantResponse ret = new();
-            using var request = new HttpRequestMessage(HttpMethod.Get, $"{TournamentsEndpoint}/{tournamentId}/participants.json?api_key={SBSettingsService.CurrentSettings?.ChallongeApiKey}");
-            using var client = HttpFactory.CreateClient();
-            using var response = await client.SendAsync(request);
-            if(response.IsSuccessStatusCode)
-            {
-                string respContent = await response.Content.ReadAsStringAsync();
-                Log.LogTrace("Participant response: " + respContent);
-                var participantResp = JsonConvert.DeserializeObject<IList<ParticipantResponse.ParticipantObject>>(respContent);
-                if(participantResp == null)
-                {
-                    string err = "Could not deserialize participant response.";
-                    ret.RequestErrors.Add(err);
-                    Log.LogError(err);
-                    return ret;
-                }
-                ret.Participants = participantResp.Select(p => p.Participant).Where(p => p.Id.HasValue).ToList();
-                return ret;
-            }
-            else
-            {
-                string err = $"Participant response error code {response.StatusCode} ({(int)response.StatusCode})";
-                ret.RequestErrors.Add(err);
-                Log.LogError(err);
-                await Log422Errors(response);
-                return ret;
-            }
-        }
-
-
-        public class MatchGetResponse
-        {
-            public class MatchObject
-            {
-                [JsonProperty("match")]
-                public ChallongeMatch Match { get; set; }
-            }
-
-            public List<ChallongeMatch> Matches { get; set; }
-            public List<string> RequestErrors = new();
-        }
-
-        public async Task<MatchGetResponse> GetMatches(string tournamentId)
-        {
-            Log.LogDebug("Getting matches");
-            using var request = new HttpRequestMessage(HttpMethod.Get, $"{TournamentsEndpoint}/{tournamentId}/matches.json?api_key={SBSettingsService.CurrentSettings?.ChallongeApiKey}");
-
-            MatchGetResponse ret = new();
-            using var client = HttpFactory.CreateClient();
-            using var response = await client.SendAsync(request);
-            if(response.IsSuccessStatusCode)
-            {
-                string respContent = await response.Content.ReadAsStringAsync();
-                Log.LogTrace("Matches response: " + respContent);
-                var matchJson = JsonConvert.DeserializeObject<IList<MatchGetResponse.MatchObject>>(respContent);
-                if(matchJson == null)
-                {
-                    string err = "Could not deserialize matches response.";
-                    Log.LogError(err);
-                    ret.RequestErrors.Add(err);
-                    return ret;
-                }
-                ret.Matches = matchJson.Select(m => m.Match).Where(m=>m.Id.HasValue).ToList();
-                return ret;
-            }
-            else
-            {
-                string err = $"Matches response error code {response.StatusCode} ({(int)response.StatusCode})";
-                ret.RequestErrors.Add(err);
-                Log.LogError(err);
-                await Log422Errors(response);
-                return ret;
-            }
-        }
-
         public class TournamentGetResponse
         {
             [JsonProperty("tournament")]
@@ -246,9 +204,9 @@ namespace Scorebini.Data
             public List<string> RequestErrors = new();
         }
 
-        public async Task<TournamentGetResponse> GetTournament(string tournamentId)
+        public async Task<TournamentGetResponse> GetChallongeTournament(string tournamentId)
         {
-            Log.LogDebug("Getting tournament");
+            Log.LogDebug("Getting challonge tournament");
             using var request = new HttpRequestMessage(HttpMethod.Get, $"{TournamentsEndpoint}/{tournamentId}.json?api_key={SBSettingsService.CurrentSettings?.ChallongeApiKey}&include_participants=1&include_matches=1");
 
             TournamentGetResponse ret = new();
@@ -281,19 +239,103 @@ namespace Scorebini.Data
         }
 
 
-        class ChallongeErrorResponse
-        {
-            [JsonProperty("errors")]
-            IList<string> Errors { get; set; }
-        }
         private async Task Log422Errors(HttpResponseMessage response)
         {
             if((int)response.StatusCode == 422)
             {
                 string content = await response.Content.ReadAsStringAsync();
-                Log.LogWarning($"Error content: {content}");
-                //var errorResp = JsonConvert.DeserializeObject<ChallongeErrorResponse>(content);
+                Log.LogWarning($"Challonge Error content: {content}");
             }
+        }
+
+
+        const string SmashggEndpoint = @"https://api.start.gg/gql/alpha";
+        public class SmashggPostResponse
+        {
+            public class DataResponse
+            {
+                [JsonProperty("event")]
+                public Smash.gg.Event Event { get; set; }
+            }
+
+
+            /// <summary>
+            /// Not sure if this is structured correctly
+            /// </summary>
+            public class ErrorResponse
+            {
+                [JsonProperty("success")]
+                public bool? Success { get; set; }
+                [JsonProperty("fields")]
+                public IList<string> Fields { get; set; } = null;
+                [JsonProperty("message")]
+                public string Message { get; set; }
+                [JsonProperty("errorId")]
+                public string ErrorId { get; set; }
+            }
+
+            [JsonProperty("data")]
+            public DataResponse Data { get; set; } = null;
+            public List<string> RequestErrors = new();
+        }
+
+        public async Task<SmashggPostResponse> GetSmashggTournament(string tournamentId)
+        {
+            SmashggPostResponse ret = new();
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"{SmashggEndpoint}");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", SBSettingsService.CurrentSettings.SmashggApiKey);
+            Data.Smash.gg.SmashGraphQLQuery queryObject = new();
+            queryObject.Query = Smash.gg.FullEventQuery.FullQuery;
+            queryObject.Variables = new()
+            {
+                { "slug", tournamentId }
+            };
+            request.Content = new StringContent(JsonConvert.SerializeObject(queryObject), System.Text.Encoding.UTF8, "application/json");
+
+            using var client = HttpFactory.CreateClient();
+            using var response = await client.SendAsync(request);
+            string responseStr = await response.Content.ReadAsStringAsync();
+            if (response.IsSuccessStatusCode)
+            {
+                SmashggPostResponse deserializedResponse = JsonConvert.DeserializeObject<SmashggPostResponse>(responseStr);
+                if (deserializedResponse == null)
+                {
+                    ret.RequestErrors.Add("Could not deserialize smashgg response. See logs for more details.");
+                    Log.LogError("Could not deserialize smashgg response with success statuc code {}. Content: \"{}\"", response.StatusCode, responseStr);
+                    return ret;
+                }
+                ret.Data = deserializedResponse.Data;
+                if (ret.Data == null)
+                {
+                    ret.RequestErrors.Add("Null data in response. Maybe error or incorrect url?");
+                    Log.LogWarning("Null data response. Content: \"{}\"", responseStr);
+                }
+
+                return ret;
+            }
+            else
+            {
+                ret.Data = null;
+                Log.LogError("Http response error. Status: {} , Content: \"{}\"", response.StatusCode, responseStr);
+                SmashggPostResponse.ErrorResponse errorResponse = JsonConvert.DeserializeObject<SmashggPostResponse.ErrorResponse>(responseStr);
+                if (errorResponse != null)
+                {
+                    if (!string.IsNullOrEmpty(errorResponse.Message))
+                    {
+                        ret.RequestErrors.Add($"Smashgg error: {errorResponse.Message}");
+                    }
+                    else
+                    {
+                        ret.RequestErrors.Add("Unspecified Smashgg error. See logs for more.");
+                    }
+                }
+                else
+                {
+                    ret.RequestErrors.Add("Unspecified Smashgg error. See logs for more.");
+                }
+                return ret;
+            }
+
         }
 
     }

@@ -5,6 +5,13 @@ using System.Threading.Tasks;
 
 namespace Scorebini.Data
 {
+    public enum TournamentHost
+    {
+        Unknown = 0,
+        Challonge,
+        Smash
+    }
+
     public enum TournamentElimType
     {
         SingleElim = 0,
@@ -14,19 +21,38 @@ namespace Scorebini.Data
 
     public class TournamentContext
     {
+
+        public class ChallongeData
+        {
+            public ChallongeTournament Tournament;
+            public List<ChallongeParticipant> Participants { get; set; } = null;
+            public List<ChallongeMatch> Matches { get; set; } = null;
+
+            public bool IsValid => Participants != null && Matches != null;
+        }
+
+        public class SmashggData
+        {
+            public Smash.gg.Event Tournament;
+            public List<Smash.gg.Entrant> Participants = null;
+            public List<Smash.gg.Set> Matches = null;
+            public bool IsValid => Participants != null && Matches != null;
+        }
+
         public string Url { get; set; }
+        public TournamentHost TournamentHost { get; set; } = TournamentHost.Unknown;
         public string TournamentId { get; set; }
-        public ChallongeTournament Tournament { get; set; }
-        public List<ChallongeParticipant> Participants { get; set; } = null;
-        public List<ChallongeMatch> Matches { get; set; } = null;
-        public long MaxRoundWinners { get; set; } = 0; // will be positive
+        public ChallongeData Challonge { get; set; } = null;
+        public SmashggData Smashgg { get; set; } = null;
+
+        public long MaxRoundWinners { get; set; } = 0; // will be positive.
         public long MaxRoundLosers { get; set; } = 0; // will be the smallest negative number
         public TournamentElimType ElimType { get; set; } = TournamentElimType.DoubleElim;
 
 
         public List<string> RequestErrors { get; set; } = new();
 
-        public bool IsValid => Participants != null && Matches != null;
+        public bool IsValid => TournamentHost != TournamentHost.Unknown && (Challonge?.IsValid == true || Smashgg?.IsValid == true);
 
         public TournamentContext()
         {
@@ -34,17 +60,21 @@ namespace Scorebini.Data
 
         public TournamentContext(ChallongeTournament tournament)
         {
-            Tournament = tournament;
-            Url = Tournament?.FullUrl;
-            TournamentId = Tournament?.UrlId;
-            Participants = Tournament?.Participants?.Select(p => p.Participant).Where(p => p != null).ToList();
-            Matches = Tournament?.Matches?.Select(m => m.Match).Where(m => m != null).ToList();
-            if(Matches != null)
+            TournamentHost = TournamentHost.Challonge;
+            Challonge = new ChallongeData()
             {
-                MaxRoundWinners = Matches.Select(m => m.Round ?? 0).Max();
-                MaxRoundLosers = Matches.Select(m => m.Round ?? 0).Min();
+                Tournament = tournament
+            };
+            Url = Challonge.Tournament?.FullUrl;
+            TournamentId = Challonge.Tournament?.UrlId;
+            Challonge.Participants = Challonge.Tournament?.Participants?.Select(p => p.Participant).Where(p => p != null).ToList();
+            Challonge.Matches = Challonge.Tournament?.Matches?.Select(m => m.Match).Where(m => m != null).ToList();
+            if(Challonge.Matches != null)
+            {
+                MaxRoundWinners = Challonge.Matches.Select(m => m.Round ?? 0).Max();
+                MaxRoundLosers = Challonge.Matches.Select(m => m.Round ?? 0).Min();
             }
-            ElimType = (Tournament?.TournamentType) switch
+            ElimType = (Challonge.Tournament?.TournamentType) switch
             {
                 "single elimination" => TournamentElimType.SingleElim,
                 "double elimination" => TournamentElimType.DoubleElim,
@@ -52,16 +82,40 @@ namespace Scorebini.Data
                 _ => TournamentElimType.DoubleElim,// sure, why not default to double elim
             };
         }
+
+
+        public TournamentContext(Smash.gg.Event tournament, string url, string tournamentId)
+        {
+            TournamentHost = TournamentHost.Smash;
+            Smashgg = new SmashggData()
+            {
+                Tournament = tournament
+            };
+            Url = url;
+            TournamentId = tournamentId;
+            Smashgg.Matches = Smashgg.Tournament?.SetConnection?.Nodes?.Where(n => n != null).ToList();
+            // this is an ugly linq query, but should only be run for < 100 item generally so performance is less of an issue
+            Smashgg.Participants = Smashgg.Matches?.SelectMany(m => m.Slots)
+                .Select(slot => slot?.Entrant).Where(e => e != null)
+                .DistinctBy(e => e.Id).ToList();
+            if (Smashgg.Matches != null)
+            {
+                MaxRoundWinners = Smashgg.Matches.Select(m => m.Round).Max();
+                MaxRoundLosers = Smashgg.Matches.Select(m => m.Round).Min();
+            }
+            // TODO: Find this information somehow
+            ElimType = TournamentElimType.DoubleElim;
+        }
     }
 
 
-    public class TournamentParticipant 
+    public class ChallongeTournamentParticipant : ITournamentParticipant
     {
         public ChallongeParticipant Model { get; private set; }
         public string Name => Model.Name;
         public long Id => Model.Id.Value;
 
-        public TournamentParticipant(ChallongeParticipant model)
+        public ChallongeTournamentParticipant(ChallongeParticipant model)
         {
             Model = model;
         }
@@ -74,17 +128,20 @@ namespace Scorebini.Data
         Open,
         Complete
     }
-    public class TournamentMatch
+    public class TournamentMatch : ITournamentMatch
     {
         public ChallongeMatch Model { get; set; }
         public long Id => Model.Id.Value;
-        public TournamentParticipant Player1 { get; set; } = null;
-        public TournamentParticipant Player2 { get; set; } = null;
+        public ChallongeTournamentParticipant Player1 { get; set; } = null;
+        public ChallongeTournamentParticipant Player2 { get; set; } = null;
         public MatchStatus Status { get; set; } = MatchStatus.Unknown;
         public string RoundName { get; set; } = "INVALID";
         public long RoundNumber => Model.Round ?? 0;
         public string Identifier => Model.Identifier;
 
+        // Explicit interface implementation to calm compile errors
+        ITournamentParticipant ITournamentMatch.Player1 => Player1;
+        ITournamentParticipant ITournamentMatch.Player2 => Player2;
 
         private static MatchStatus StatusFromString(string status)
         {
@@ -109,11 +166,11 @@ namespace Scorebini.Data
             };
             if(ret.Model.Player1Id.HasValue && tournament.Participants.TryGetValue(ret.Model.Player1Id.Value, out var player1))
             {
-                ret.Player1 = player1;
+                ret.Player1 = player1 as ChallongeTournamentParticipant;
             }
             if(ret.Model.Player2Id.HasValue && tournament.Participants.TryGetValue(ret.Model.Player2Id.Value, out var player2))
             {
-                ret.Player2 = player2;
+                ret.Player2 = player2 as ChallongeTournamentParticipant;
             }
             ret.RoundName = GetRoundName(tournament, model.Round ?? 0);
             return ret;
@@ -177,34 +234,57 @@ namespace Scorebini.Data
         public string Url => Model.Url;
         public TournamentContext Model { get; set; }
         public string Id => Model.TournamentId;
-        public Dictionary<long, TournamentParticipant> Participants { get; } = new();
-        public Dictionary<long, TournamentMatch> Matches { get; } = new();
-        public List<TournamentParticipant> AlphabeticalParticipants { get; } = new();
+        public Dictionary<long, ITournamentParticipant> Participants { get; } = new();
+        public Dictionary<long, ITournamentMatch> Matches { get; } = new();
+        public List<ITournamentParticipant> AlphabeticalParticipants { get; } = new();
 
         public TournamentView(TournamentContext model)
         {
             Model = model;
-            if (Model.Participants == null)
-                return;
-            foreach (var partModel in Model.Participants)
+
+            if (Model.TournamentHost == TournamentHost.Challonge && Model.Challonge != null)
             {
-                if (partModel.Id.HasValue)
+                if (Model.Challonge.Participants == null)
+                    return;
+                foreach (var partModel in Model.Challonge.Participants)
                 {
-                    Participants.Add(partModel.Id.Value, new TournamentParticipant(partModel));
+                    if (partModel.Id.HasValue)
+                    {
+                        Participants.Add(partModel.Id.Value, new ChallongeTournamentParticipant(partModel));
+                    }
+                }
+
+
+                if (Model.Challonge.Matches == null)
+                    return;
+                foreach (var matchModel in Model.Challonge.Matches)
+                {
+                    if (matchModel.Id.HasValue)
+                    {
+                        Matches.Add(matchModel.Id.Value, TournamentMatch.Create(this, matchModel));
+                    }
                 }
             }
+            else if (Model.TournamentHost == TournamentHost.Smash && Model.Smashgg != null)
+            {
+                if (Model.Smashgg.Participants == null)
+                    return;
+                foreach (var partModel in Model.Smashgg.Participants)
+                {
+                    Participants.Add(partModel.Id, new Smash.gg.TournamentParticipant(partModel));
+                }
+
+
+                if (Model.Smashgg.Matches == null)
+                    return;
+                foreach (var matchModel in Model.Smashgg.Matches)
+                {
+                    Matches.Add(matchModel.Id, Smash.gg.TournamentMatch.Create(this, matchModel));
+                }
+            }
+
 
             AlphabeticalParticipants = Participants.Values.OrderBy(p => p.Name).ToList();
-
-            if (Model.Matches == null)
-                return;
-            foreach (var matchModel in Model.Matches)
-            {
-                if (matchModel.Id.HasValue)
-                {
-                    Matches.Add(matchModel.Id.Value, TournamentMatch.Create(this, matchModel));
-                }
-            }
         }
     }
 }

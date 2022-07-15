@@ -10,5 +10,6 @@ namespace Scorebini.Data
         public string ChallongeApiKey { get; set; }
         public string OutputDirectory { get; set; } = "output";
         public int UpdateIntervalSeconds { get; set; } = 30;
+        public string SmashggApiKey { get; set; }
     }
 }

@@ -11,8 +11,8 @@
 <h3>ScoreboardEditor</h3>
 <p>
     <label>
-        Challonge URL
-        <input @bind="InputState.ChallongeUrl" />
+        Challonge/Start.gg URL
+        <input @bind="InputState.Url" />
     </label>
     <button class="btn btn-primary" @onclick="(async () => await UpdateContext())" disabled="@DisableUpdateButton">
         <div class="oi oi-data-transfer-download" />
@@ -124,7 +124,7 @@
     ScoreboardInputState InputState = new();
 
     bool _isUpdatingContext = false;
-    bool DisableUpdateButton => string.IsNullOrWhiteSpace(InputState.ChallongeUrl) || _isUpdatingContext;
+    bool DisableUpdateButton => string.IsNullOrWhiteSpace(InputState.Url) || _isUpdatingContext;
     List<string> ContextUpdateErrors = null;
 
     TournamentView Tournament = null;
@@ -177,7 +177,7 @@
         _isUpdatingContext = true;
         StateHasChanged(); // ensure button is disabled
         SettingsSvc.SaveInputState(InputState);
-        var context = await TournamentSvc.InitForTournamentId(InputState.ChallongeUrl, TournamentService.ExtractTournamentIdFromUrl(InputState.ChallongeUrl));
+        var context = await TournamentSvc.InitForTournamentUrl(InputState.Url);
         if(context == null || !context.IsValid)
         {
             // Only clear the current state if the user has requested a new tournament. Otherwise,
