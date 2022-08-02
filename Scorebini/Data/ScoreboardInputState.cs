@@ -17,6 +17,7 @@ namespace Scorebini.Data
         public string Name { get; set; }
         public int Score { get; set; }
         public GrandFinalsPosition GFPosition { get; set; } = GrandFinalsPosition.None;
+        public long? Id { get; set; }
 
         public string FormatName()
         {
@@ -49,6 +50,7 @@ namespace Scorebini.Data
         public ScoreboardPlayerState Player1 { get; set; } = new();
         public ScoreboardPlayerState Player2 { get; set; } = new();
         public string RoundName { get; set; } = "";
+        public long? MatchId { get; set; } = null;
 
         public List<Commentator> Commentators { get; set; } = new();
 

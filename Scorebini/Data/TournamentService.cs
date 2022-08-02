@@ -107,6 +107,105 @@ namespace Scorebini.Data
             return ret;
         }
 
+        public class PushScoreResponse
+        {
+            public bool Success { get; set; } = false;
+            public List<string> Errors { get; } = new();
+        }
+
+
+        public async Task<PushScoreResponse> PushScore(MatchScoreReport report)
+        {
+            try
+            {
+                if (report.Tournament.Model?.TournamentHost == TournamentHost.Challonge)
+                {
+                    return await PushChallongeScore(report);
+                }
+            }
+            catch(Exception ex)
+            {
+                Log.LogError(ex, ex.Message);
+                var ret = new PushScoreResponse()
+                {
+                    Success = false
+                };
+                ret.Errors.Add(ex.Message);
+                return ret;
+            }
+
+            var errRet = new PushScoreResponse()
+            {
+                Success = false
+            };
+            errRet.Errors.Add("Could not determine tournament host for match update.");
+            Log.LogError("Could not determine tournament host for match update.");
+            return errRet;
+        }
+
+
+        class ChallongePushScoreBody
+        {
+            public class MatchObject
+            {
+                [JsonProperty("scores_csv")]
+                public string ScoresCsv { get; set; }
+                [JsonProperty("winner_id")]
+                public long WinnerId { get; set; }
+            }
+            [JsonProperty("match")]
+            public MatchObject Match { get; set; }
+        }
+
+        public async Task<PushScoreResponse> PushChallongeScore(MatchScoreReport report)
+        {
+
+            PushScoreResponse ret = new();
+            ret.Success = false;
+            Log.LogDebug("Updating Challonge match {}", report.Match?.Id);
+            if (report.Scores.Count != 2)
+            {
+                ret.Success = false;
+                ret.Errors.Add($"Score report had incorrect number of scores. Expected 2, got {report.Scores.Count}.");
+            }
+            var challongeMatch = report.Match as TournamentMatch;
+            using var request = new HttpRequestMessage(HttpMethod.Put, $"{TournamentsEndpoint}/{report.Tournament.Model.TournamentId}/matches/{challongeMatch.Id}.json?api_key={SBSettingsService.CurrentSettings?.ChallongeApiKey}");
+
+            ChallongePushScoreBody bodyObj = new()
+            {
+                Match = new()
+            };
+            bodyObj.Match.WinnerId = report.Scores.OrderByDescending(s => s.Wins).First().Player.Id;
+            int p1 = 0;
+            int p2 = 1;
+            if (report.Scores[0].Player.Id == report.Match.Player2.Id)
+            {
+                p1 = 1;
+                p2 = 0;
+            }
+            bodyObj.Match.ScoresCsv = $"{report.Scores[p1]}-{report.Scores[p2]}";
+
+            request.Content = new StringContent(JsonConvert.SerializeObject(bodyObj), System.Text.Encoding.UTF8, "application/json");
+
+
+            using var client = HttpFactory.CreateClient();
+            using var response = await client.SendAsync(request);
+            if (response.IsSuccessStatusCode)
+            {
+                ret.Success = true;
+                return ret;
+            }
+            else
+            {
+                string responseStr = await response.Content.ReadAsStringAsync();
+                Log.LogError("Http response error when updating challonge match. Status: {} Content: '{}'", response.StatusCode, responseStr);
+                ret.Success = false;
+                ret.Errors.Add($"Http response error when updating challonge match. Status {response.StatusCode} ({(int)response.StatusCode}). See logs.");
+                return ret;
+            }
+        }
+
+
         public List<ITournamentParticipant> GetPendingOpponents(ITournamentParticipant participant, TournamentView tournament)
         {
             var ret = new List<ITournamentParticipant>();

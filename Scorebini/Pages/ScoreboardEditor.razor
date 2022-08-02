@@ -14,13 +14,26 @@
         Challonge/Start.gg URL
         <input @bind="InputState.Url" />
     </label>
-    <button class="btn btn-primary" @onclick="(async () => await UpdateContext())" disabled="@DisableUpdateButton">
-        <div class="oi oi-data-transfer-download" />
-        Pull
-    </button>
+    <div>
+        <button class="btn btn-primary" @onclick="(async () => await UpdateContext())" disabled="@DisableUpdateButton">
+            <div class="oi oi-data-transfer-download" />
+            Pull
+        </button>
+        <button class="btn btn-primary" @onclick="(async () => await PushScore())" disabled="@(!CanPushScore || DisableUpdateButton)">
+            Push
+            <div class="oi oi-data-transfer-upload" />
+        </button>
+    </div>
     @if(ContextUpdateErrors != null && ContextUpdateErrors.Count > 0)
     {
         foreach(var errStr in ContextUpdateErrors)
+        {
+            <p class="text-danger">@errStr</p>
+        }
+    }
+    @if(PushScoreErrors != null)
+    {
+        foreach(var errStr in PushScoreErrors)
         {
             <p class="text-danger">@errStr</p>
         }
@@ -36,7 +49,7 @@
                 Player 1:
             </label>
             <ScoreComponent @ref="ScorePlayer1" />
-            <select style="height: 2.5em" name="player1_name" value="@InputState.Player1.Name" @onchange="Player1InputChanged">
+            <select style="height: 2.5em" name="player1_name" value=@($"__player__{InputState.Player1.Id}") @onchange="Player1InputChanged">
                 <optgroup label="Next Matches">
                     @foreach(var match in TournamentSvc.GetPendingMatches(Tournament))
                     {
@@ -46,7 +59,7 @@
                 <optgroup label="All Players">
                     @foreach(var participant in TournamentSvc.ParticipantAutocompleteList(InputState.Player1.Name, Tournament))
                     {
-                        <option value="@participant.Name">@participant.Name</option>
+                        <option value="__player__@participant.Name">@participant.Name</option>
                     }
                 </optgroup>
             </select>
@@ -57,7 +70,7 @@
                 Player 2:
             </label>
             <ScoreComponent @ref="ScorePlayer2" />
-            <select style="height: 2.5em" name="player2_name" value="@InputState.Player2.Name" @onchange="Player2InputChanged">
+            <select style="height: 2.5em" name="player2_name" value=@($"__player__{InputState.Player2.Id}") @onchange="Player2InputChanged">
                 <optgroup label="Next Matches">
                     @foreach(var match in TournamentSvc.GetPendingMatches(Tournament))
                     {
@@ -67,7 +80,7 @@
                 <optgroup label="All Players">
                     @foreach(var participant in TournamentSvc.ParticipantAutocompleteList(InputState.Player2.Name, Tournament))
                     {
-                        <option value="@participant.Name">@participant.Name</option>
+                        <option value="__player__@participant.Name">@participant.Name</option>
                     }
                 </optgroup>
             </select>
@@ -125,7 +138,10 @@
 
     bool _isUpdatingContext = false;
     bool DisableUpdateButton => string.IsNullOrWhiteSpace(InputState.Url) || _isUpdatingContext;
+    bool CanPushScore => InputState.MatchId.HasValue == true;
+
     List<string> ContextUpdateErrors = null;
+    List<string> PushScoreErrors = null;
 
     TournamentView Tournament = null;
     CommentatorList Commentators = null;
@@ -200,6 +216,53 @@
     }
 
 
+    private async Task PushScore()
+    {
+        _isUpdatingContext = true;
+        StateHasChanged();
+        SettingsSvc.SaveInputState(InputState);
+        if(Tournament.Model?.IsValid == true
+            && InputState.MatchId.HasValue 
+            && InputState.Player1?.Id.HasValue == true
+            && InputState.Player2?.Id.HasValue == true)
+        {
+            MatchScoreReport report = new MatchScoreReport();
+            if(Tournament.Matches.TryGetValue(InputState.MatchId.Value, out var match))
+            {
+                report.Match = match;
+            }
+            if (Tournament.Participants.TryGetValue(InputState.Player1.Id.Value, out var p1))
+            {
+                report.Scores.Add(new MatchScoreReport.Score()
+                {
+                    Player = p1,
+                    Wins = InputState.Player1.Score
+                });
+            }
+            if (Tournament.Participants.TryGetValue(InputState.Player2.Id.Value, out var p2))
+            {
+                report.Scores.Add(new MatchScoreReport.Score()
+                {
+                    Player = p2,
+                    Wins = InputState.Player2.Score
+                });
+            }
+            report.Tournament = Tournament;
+            var result = await TournamentSvc.PushScore(report);
+            if(result.Success)
+            {
+                PushScoreErrors = null;
+            }
+            else
+            {
+                PushScoreErrors = result.Errors;
+            }
+        }
+        _isUpdatingContext = false;
+        await UpdateContext();
+    }
+
+
     private async void UpdatePollEventCallback(object sender, System.Timers.ElapsedEventArgs args)
     {
         if (_isUpdatingContext) // don't stack up update calls
@@ -245,14 +308,43 @@
                 if(match.Player1 != null)
                 {
                     InputState.Player1.Name = match.Player1.Name;
+                    InputState.Player1.Id = match.Player1.Id;
                 }
                 if(match.Player2 != null)
                 {
                     InputState.Player2.Name = match.Player2.Name;
+                    InputState.Player2.Id = match.Player2.Id;
                 }
                 InputState.RoundName = match.RoundName;
+                InputState.MatchId = match.Id;
             }
         }
+    }
+
+
+    private void SetPlayerFromId(string optionValue, ScoreboardPlayerState player)
+    {
+        string idStr = optionValue.Substring("__player__".Length);
+        if(long.TryParse(idStr, out long playerId))
+        {
+            if(Tournament.Participants.TryGetValue(playerId, out var participant))
+            {
+                player.Name = participant.Name;
+                player.Id = participant.Id;
+                return;
+            }
+            else
+            {
+                Log.LogError("Could not find player with id {} from id string {}", playerId, idStr);
+            }
+        }
+        else
+        {
+            Log.LogError("Could not parse number from option value {}", optionValue);
+        }
+
+        player.Name = "ERROR";
+        player.Id = null;
     }
 
     private void Player1InputChanged(ChangeEventArgs e)
@@ -262,9 +354,15 @@
         {
             SetMatchFromSelection(val);
         }
+        else if (val?.StartsWith("__player__") == true)
+        {
+            SetPlayerFromId(val, InputState.Player1);
+        }
         else
         {
             InputState.Player1.Name = e.Value as string;
+            InputState.Player1.Id = null; 
+            InputState.MatchId = null;
         }
         StateHasChanged();
     }
@@ -276,9 +374,15 @@
         {
             SetMatchFromSelection(val);
         }
+        else if (val?.StartsWith("__player__") == true)
+        {
+            SetPlayerFromId(val, InputState.Player2);
+        }
         else
         {
             InputState.Player2.Name = e.Value as string;
+            InputState.Player2.Id = null;
+            InputState.MatchId = null;
         }
         StateHasChanged();
     }

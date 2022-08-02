@@ -19,6 +19,19 @@ namespace Scorebini.Data
         RoundRobin
     }
 
+
+    public class MatchScoreReport
+    {
+        public class Score
+        {
+            public ITournamentParticipant Player { get; set; }
+            public int Wins { get; set; }
+        }
+        public TournamentView Tournament { get; set; }
+        public ITournamentMatch Match { get; set; }
+        public List<Score> Scores { get; } = new();
+    }
+
     public class TournamentContext
     {
 
