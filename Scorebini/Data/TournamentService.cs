@@ -122,6 +122,10 @@ namespace Scorebini.Data
                 {
                     return await PushChallongeScore(report);
                 }
+                else if (report.Tournament.Model?.TournamentHost == TournamentHost.Smash)
+                {
+                    return await PushSmashggScore(report);
+                }
             }
             catch(Exception ex)
             {
@@ -205,6 +209,77 @@ namespace Scorebini.Data
                 ret.Errors.Add($"Http response error when updating challonge match. Status {response.StatusCode} ({(int)response.StatusCode}). See logs.");
                 return ret;
             }
+        }
+
+
+        class SmashggPushScoreBody
+        {
+            [JsonProperty("entrant1Id")]
+            public long Entrant1Id { get; set; }
+            [JsonProperty("entrant1Score")]
+            public int Entrant1Score { get; set; }
+            [JsonProperty("entrant2Id")]
+            public long Entrant2Id { get; set; }
+            [JsonProperty("entrant2Score")]
+            public int Entrant2Score { get; set; }
+        }
+
+        /// <summary>
+        /// Note: This will always 403 asking for login.
+        /// No documentation on how to do so.
+        /// It was reverse engineered from network debugger so probably missing something important.
+        /// </summary>
+        /// <param name="report"></param>
+        /// <returns></returns>
+        public async Task<PushScoreResponse> PushSmashggScore(MatchScoreReport report)
+        {
+            PushScoreResponse ret = new PushScoreResponse();
+            ret.Success = false;
+            Log.LogDebug("Updating Smashgg match {}", report.Match?.Id);
+            if (report.Scores.Count != 2)
+            {
+                ret.Success = false;
+                ret.Errors.Add($"Score report had incorrect number of scores. Expected 2, got {report.Scores.Count}.");
+            }
+
+            //using var request = new HttpRequestMessage(HttpMethod.Put, $"https://www.start.gg/api/-/rest/set/{report.Match.Id}/complete");
+            using var request = new HttpRequestMessage(HttpMethod.Put, $"https://api.start.gg/set/{report.Match.Id}/complete");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", SBSettingsService.CurrentSettings.SmashggApiKey);
+
+            var bodyObj = new SmashggPushScoreBody();
+            int p1 = 0;
+            int p2 = 1;
+            if (report.Scores[0].Player.Id == report.Match.Player2.Id)
+            {
+                p1 = 1;
+                p2 = 0;
+            }
+            bodyObj.Entrant1Id = report.Scores[p1].Player.Id;
+            bodyObj.Entrant1Score = report.Scores[p1].Wins;
+            bodyObj.Entrant2Id = report.Scores[p2].Player.Id;
+            bodyObj.Entrant2Score = report.Scores[p2].Wins;
+
+            string bodyJson = JsonConvert.SerializeObject(bodyObj);
+            request.Content = new StringContent(bodyJson, System.Text.Encoding.UTF8, "application/json");
+
+
+            Log.LogInformation("Sending request {} body {}", request, bodyJson);
+            using var client = HttpFactory.CreateClient();
+            using var response = await client.SendAsync(request);
+            if (response.IsSuccessStatusCode)
+            {
+                ret.Success = true;
+                return ret;
+            }
+            else
+            {
+                string responseStr = await response.Content.ReadAsStringAsync();
+                Log.LogError("Http response error when updating challonge match. Status: {} Content: '{}'", response.StatusCode, responseStr);
+                ret.Success = false;
+                ret.Errors.Add($"Http response error when updating challonge match. Status {response.StatusCode} ({(int)response.StatusCode}). See logs.");
+                return ret;
+            }
+
         }
 
 
