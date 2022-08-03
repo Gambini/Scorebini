@@ -1,0 +1,181 @@
+﻿@using Scorebini.Data
+@using Scorebini.Shared
+@using Microsoft.Extensions.Logging
+@using Blazorise
+
+@inject TournamentService TournamentSvc 
+@inject ILogger<PlayerInputComponent> Log
+
+<div class="mb-1">
+    <label for="player1_name">
+        Player @(PlayerIndex + 1)
+    </label>
+    <ScoreComponent @ref="ScoreComp" />
+    <WinnersLosersToggleComponent @ref="WLTComp" Position=@PlayerState.GFPosition />
+    <Select style="height: 2.5em" name="player1_name" 
+        TValue="string" SelectedValue="@SelectedIdStr" 
+        SelectedValueChanged="@OnSelectedPlayerChanged"
+        @ref="SelectComponent"
+        Clearfix=true
+        >
+        <SelectGroup Label="Next Matches">
+            @foreach(var match in TournamentSvc.GetPendingMatches(Tournament))
+            {
+                <SelectItem Value="@(new MatchOrParticipantId(match).ToJson())">
+                    @match.Player1.Name / @match.Player2.Name
+                </SelectItem>
+            }
+        </SelectGroup>
+        <SelectGroup Label="All Players">
+            @foreach(var participant in TournamentSvc.ParticipantAutocompleteList(PlayerState.Name, Tournament))
+            {
+                <SelectItem Value="@(new MatchOrParticipantId(participant).ToJson())">
+                    @participant.Name
+                </SelectItem>
+            }
+        </SelectGroup>
+    </Select>
+</div>
+
+@code {
+    [Parameter]
+    public ScoreboardPlayerState PlayerState { get; set; }
+    [Parameter]
+    public TournamentView Tournament { get; set; }
+    [Parameter]
+    public int PlayerIndex { get; set; } = 0;
+    [Parameter]
+    public EventCallback<PlayerInputMatchSelectedEventArgs> MatchSelected { get; set; }
+    [Parameter]
+    public EventCallback<PlayerInputPlayerSelectedEventArgs> PlayerSelected { get; set; }
+
+    public ScoreComponent ScoreComp { get; set; }
+    public WinnersLosersToggleComponent WLTComp { get; set; }
+
+    Blazorise.Select<string> SelectComponent;
+
+    // There is a problem with reselecting the same match and 
+    // the text stays as the match text instead of changing to
+    // participant text.
+    // Force render null selection once and fix it up in OnAfterRender
+    bool ForceSyncSelection = false;
+
+    string SelectedIdStr { get; set; }
+    private MatchOrParticipantId m_selectedId;
+    public MatchOrParticipantId SelectedId 
+    {
+        get => m_selectedId;
+        set
+        {
+            m_selectedId = value;
+            SelectedIdStr = m_selectedId.ToJson();
+        }
+    }
+
+    async Task OnSelectedPlayerChanged(string valueStr)
+    {
+        if (Tournament == null)
+            return;
+
+        MatchOrParticipantId value = new MatchOrParticipantId(valueStr);
+        if (value.Type == MatchOrParticipant.Match)
+        {
+            if(Tournament.Matches.TryGetValue(value.Id, out var match))
+            {
+                var eventArgs = new PlayerInputMatchSelectedEventArgs(this, match);
+                UpdateFromMatchSelection(eventArgs);
+                await MatchSelected.InvokeAsync(new PlayerInputMatchSelectedEventArgs(this, match));
+            }
+            else
+            {
+                SelectedId = value;
+            }
+        }
+        else
+        {
+            SelectedId = value;
+            PlayerState.Id = value.Id;
+            if(Tournament.Participants.TryGetValue(value.Id, out var participant))
+            {
+                PlayerState.Name = participant.Name;
+                await PlayerSelected.InvokeAsync(new PlayerInputPlayerSelectedEventArgs(this, participant));
+            }
+            StateHasChanged();
+        }
+    }
+
+
+    public void UpdateFromMatchSelection(PlayerInputMatchSelectedEventArgs args)
+    {
+        ITournamentParticipant participant;
+        if(PlayerIndex == 0)
+        {
+            participant = args.Match.Player1;
+        }
+        else
+        {
+            participant = args.Match.Player2;
+        }
+        var newSelection = new MatchOrParticipantId(participant);
+        if(newSelection == SelectedId)
+        {
+            ForceSyncSelection = true;
+            SelectedIdStr = null;
+        }
+        else
+        {
+            SelectedId = newSelection;
+            PlayerState.Id = participant.Id;
+            PlayerState.Name = participant.Name;
+        }
+        StateHasChanged();
+    }
+
+
+    public void PlayerStateSwapped(ScoreboardPlayerState newState)
+    {
+        PlayerState = newState;
+        ScoreComp?.SetScore(newState.Score);
+        SelectedId = new MatchOrParticipantId(MatchOrParticipant.Participant, newState.Id ?? 0);
+        StateHasChanged();
+    }
+
+
+    public void ReadNonBoundValues()
+    {
+        PlayerState.Score = ScoreComp.ScoreNumber;
+        PlayerState.GFPosition = WLTComp.Position;
+    }
+
+    protected override bool ShouldRender()
+    {
+        bool baseRender = base.ShouldRender();
+        bool selectionDiff = false;
+        if(SelectComponent != null)
+        {
+            selectionDiff = (SelectComponent.SelectedValue != SelectedIdStr);
+        }
+        return baseRender || selectionDiff;
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        base.OnAfterRender(firstRender);
+        if(ForceSyncSelection)
+        {
+            ForceSyncSelection = false;
+            SelectedId = new MatchOrParticipantId(MatchOrParticipant.Participant, PlayerState.Id ?? 0);
+            StateHasChanged();
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
+        if (!ForceSyncSelection)
+        {
+            PlayerStateSwapped(PlayerState);
+        }
+    }
+
+}

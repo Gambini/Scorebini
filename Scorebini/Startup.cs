@@ -9,6 +9,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Scorebini.Data;
+using Blazorise;
+using Blazorise.Bootstrap;
+using Blazorise.Icons.FontAwesome;
 
 namespace Scorebini
 {
@@ -32,6 +35,12 @@ namespace Scorebini
             services.AddSingleton<ScoreboardSettingsService>();
             services.AddSingleton<TournamentService>();
             services.AddSingleton<CommentatorService>();
+            services.AddBlazorise(options =>
+            {
+                options.Immediate = true;
+            });
+            services.AddBootstrapProviders();
+            services.AddFontAwesomeIcons();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

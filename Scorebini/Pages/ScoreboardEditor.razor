@@ -44,48 +44,22 @@
 {
 
     <div>
-        <div class="mb-1">
-            <label for="player1_name">
-                Player 1:
-            </label>
-            <ScoreComponent @ref="ScorePlayer1" />
-            <select style="height: 2.5em" name="player1_name" value=@($"__player__{InputState.Player1.Id}") @onchange="Player1InputChanged">
-                <optgroup label="Next Matches">
-                    @foreach(var match in TournamentSvc.GetPendingMatches(Tournament))
-                    {
-                        <option value="__id__@match.Id">@match.Player1.Name / @match.Player2.Name</option>
-                    }
-                </optgroup>
-                <optgroup label="All Players">
-                    @foreach(var participant in TournamentSvc.ParticipantAutocompleteList(InputState.Player1.Name, Tournament))
-                    {
-                        <option value="__player__@participant.Name">@participant.Name</option>
-                    }
-                </optgroup>
-            </select>
-            <WinnersLosersToggleComponent @ref="WLTPlayer1" Position=@InputState.Player1.GFPosition />
-        </div>
-        <div>
-            <label for="player2_name">
-                Player 2:
-            </label>
-            <ScoreComponent @ref="ScorePlayer2" />
-            <select style="height: 2.5em" name="player2_name" value=@($"__player__{InputState.Player2.Id}") @onchange="Player2InputChanged">
-                <optgroup label="Next Matches">
-                    @foreach(var match in TournamentSvc.GetPendingMatches(Tournament))
-                    {
-                        <option value="__id__@match.Id">@match.Player1.Name / @match.Player2.Name</option>
-                    }
-                </optgroup>
-                <optgroup label="All Players">
-                    @foreach(var participant in TournamentSvc.ParticipantAutocompleteList(InputState.Player2.Name, Tournament))
-                    {
-                        <option value="__player__@participant.Name">@participant.Name</option>
-                    }
-                </optgroup>
-            </select>
-            <WinnersLosersToggleComponent @ref="WLTPlayer2" Position=@InputState.Player2.GFPosition />
-        </div>
+        <PlayerInputComponent 
+            @ref="Player1Input"
+            PlayerState="@InputState.Player1"
+            Tournament="@Tournament"
+            PlayerIndex=0
+            MatchSelected="@OnMatchSelected"
+            PlayerSelected="@OnPlayerSelected"
+            />
+        <PlayerInputComponent 
+            @ref="Player2Input"
+            PlayerState="@InputState.Player2"
+            Tournament="@Tournament"
+            PlayerIndex=1
+            MatchSelected="@OnMatchSelected"
+            PlayerSelected="@OnPlayerSelected"
+            />
     </div>
     <div class="mt-1" />
     <button class="btn btn-primary" @onclick="SwapPlayerButtonClicked">
@@ -138,7 +112,7 @@
 
     bool _isUpdatingContext = false;
     bool DisableUpdateButton => string.IsNullOrWhiteSpace(InputState.Url) || _isUpdatingContext;
-    bool CanPushScore => InputState.MatchId.HasValue == true;
+    bool CanPushScore => (InputState.MatchId.HasValue == true) && (Tournament?.Model?.TournamentHost == TournamentHost.Challonge) && (Tournament?.IsValidMatchId(InputState.MatchId.Value) == true);
 
     List<string> ContextUpdateErrors = null;
     List<string> PushScoreErrors = null;
@@ -151,11 +125,8 @@
     System.Timers.Timer UpdatePollTimer;
     DateTime PrevUpdateTime;
 
-    // I don't know how to do input binding correctly, so these are referenced to hack around it
-    ScoreComponent ScorePlayer1;
-    ScoreComponent ScorePlayer2;
-    WinnersLosersToggleComponent WLTPlayer1;
-    WinnersLosersToggleComponent WLTPlayer2;
+    PlayerInputComponent Player1Input;
+    PlayerInputComponent Player2Input;
 
     protected override void OnInitialized()
     {
@@ -279,11 +250,8 @@
 
     void ReadNonBoundValuesForPlayers()
     {
-        InputState.Player1.Score = ScorePlayer1.ScoreNumber;
-        InputState.Player2.Score = ScorePlayer2.ScoreNumber;
-        InputState.Player1.GFPosition = WLTPlayer1.Position;
-        InputState.Player2.GFPosition = WLTPlayer2.Position;
-
+        Player1Input.ReadNonBoundValues();
+        Player2Input.ReadNonBoundValues();
     }
 
     private void UpdateScoreboardButtonClicked()
@@ -297,94 +265,26 @@
         SettingsSvc.WriteOutputFiles(SettingsSvc.CurrentSettings, InputState);
     }
 
-
-    private void SetMatchFromSelection(string optionValue)
+    public Task OnMatchSelected(PlayerInputMatchSelectedEventArgs args)
     {
-        string idStr = optionValue.Substring("__id__".Length);
-        if(long.TryParse(idStr, out long matchId))
+        InputState.MatchId = args.Match.Id;
+        if (args.Sender == Player1Input)
         {
-            if(Tournament.Matches.TryGetValue(matchId, out var match))
-            {
-                if(match.Player1 != null)
-                {
-                    InputState.Player1.Name = match.Player1.Name;
-                    InputState.Player1.Id = match.Player1.Id;
-                }
-                if(match.Player2 != null)
-                {
-                    InputState.Player2.Name = match.Player2.Name;
-                    InputState.Player2.Id = match.Player2.Id;
-                }
-                InputState.RoundName = match.RoundName;
-                InputState.MatchId = match.Id;
-            }
-        }
-    }
-
-
-    private void SetPlayerFromId(string optionValue, ScoreboardPlayerState player)
-    {
-        string idStr = optionValue.Substring("__player__".Length);
-        if(long.TryParse(idStr, out long playerId))
-        {
-            if(Tournament.Participants.TryGetValue(playerId, out var participant))
-            {
-                player.Name = participant.Name;
-                player.Id = participant.Id;
-                return;
-            }
-            else
-            {
-                Log.LogError("Could not find player with id {} from id string {}", playerId, idStr);
-            }
+            Player2Input.UpdateFromMatchSelection(args);
         }
         else
         {
-            Log.LogError("Could not parse number from option value {}", optionValue);
+            Player1Input.UpdateFromMatchSelection(args);
         }
 
-        player.Name = "ERROR";
-        player.Id = null;
+        return Task.CompletedTask;
     }
 
-    private void Player1InputChanged(ChangeEventArgs e)
-    {
-        string val = e.Value as string;
-        if(!string.IsNullOrWhiteSpace(val) && val.StartsWith("__id__"))
-        {
-            SetMatchFromSelection(val);
-        }
-        else if (val?.StartsWith("__player__") == true)
-        {
-            SetPlayerFromId(val, InputState.Player1);
-        }
-        else
-        {
-            InputState.Player1.Name = e.Value as string;
-            InputState.Player1.Id = null; 
-            InputState.MatchId = null;
-        }
-        StateHasChanged();
-    }
 
-    private void Player2InputChanged(ChangeEventArgs e)
+    public Task OnPlayerSelected(PlayerInputPlayerSelectedEventArgs _)
     {
-        string val = e.Value as string;
-        if(!string.IsNullOrWhiteSpace(val) && val.StartsWith("__id__"))
-        {
-            SetMatchFromSelection(val);
-        }
-        else if (val?.StartsWith("__player__") == true)
-        {
-            SetPlayerFromId(val, InputState.Player2);
-        }
-        else
-        {
-            InputState.Player2.Name = e.Value as string;
-            InputState.Player2.Id = null;
-            InputState.MatchId = null;
-        }
-        StateHasChanged();
+        InputState.MatchId = null;
+        return Task.CompletedTask;
     }
 
     private void RoundNameInputChanged(ChangeEventArgs e)
@@ -399,8 +299,8 @@
     {
         ReadNonBoundValuesForPlayers();
         InputState.SwapPlayers();
-        ScorePlayer1.SetScore(InputState.Player1.Score);
-        ScorePlayer2.SetScore(InputState.Player2.Score);
+        Player1Input.PlayerStateSwapped(InputState.Player1);
+        Player2Input.PlayerStateSwapped(InputState.Player2);
         StateHasChanged();
     }
 

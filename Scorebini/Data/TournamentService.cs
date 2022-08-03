@@ -183,11 +183,13 @@ namespace Scorebini.Data
                 p1 = 1;
                 p2 = 0;
             }
-            bodyObj.Match.ScoresCsv = $"{report.Scores[p1]}-{report.Scores[p2]}";
+            bodyObj.Match.ScoresCsv = $"{report.Scores[p1].Wins}-{report.Scores[p2].Wins}";
 
-            request.Content = new StringContent(JsonConvert.SerializeObject(bodyObj), System.Text.Encoding.UTF8, "application/json");
+            string bodyJson = JsonConvert.SerializeObject(bodyObj);
+            request.Content = new StringContent(bodyJson, System.Text.Encoding.UTF8, "application/json");
 
 
+            Log.LogInformation("Sending request {} body {}", request, bodyJson);
             using var client = HttpFactory.CreateClient();
             using var response = await client.SendAsync(request);
             if (response.IsSuccessStatusCode)

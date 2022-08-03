@@ -299,5 +299,11 @@ namespace Scorebini.Data
 
             AlphabeticalParticipants = Participants.Values.OrderBy(p => p.Name).ToList();
         }
+
+
+        public bool IsValidMatchId(long id)
+        {
+            return Matches?.ContainsKey(id) == true;
+        }
     }
 }
