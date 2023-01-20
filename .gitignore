@@ -11,3 +11,6 @@
 /.vscode
 /Scorebini/Config
 /publish
+/ScorebiniTwitchApi/bin
+/ScorebiniTwitchApi/obj
+/ScorebiniTwitchApi/twitch_tokens.db

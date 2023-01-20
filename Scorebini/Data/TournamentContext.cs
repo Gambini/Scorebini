@@ -82,7 +82,7 @@ namespace Scorebini.Data
             TournamentId = Challonge.Tournament?.UrlId;
             Challonge.Participants = Challonge.Tournament?.Participants?.Select(p => p.Participant).Where(p => p != null).ToList();
             Challonge.Matches = Challonge.Tournament?.Matches?.Select(m => m.Match).Where(m => m != null).ToList();
-            if(Challonge.Matches != null)
+            if(Challonge.Matches != null && Challonge.Matches.Count > 0)
             {
                 MaxRoundWinners = Challonge.Matches.Select(m => m.Round ?? 0).Max();
                 MaxRoundLosers = Challonge.Matches.Select(m => m.Round ?? 0).Min();
@@ -111,7 +111,7 @@ namespace Scorebini.Data
             Smashgg.Participants = Smashgg.Matches?.SelectMany(m => m.Slots)
                 .Select(slot => slot?.Entrant).Where(e => e != null)
                 .DistinctBy(e => e.Id).ToList();
-            if (Smashgg.Matches != null)
+            if (Smashgg.Matches != null && Smashgg.Matches.Count > 0)
             {
                 MaxRoundWinners = Smashgg.Matches.Select(m => m.Round).Max();
                 MaxRoundLosers = Smashgg.Matches.Select(m => m.Round).Min();
