@@ -1,0 +1,64 @@
+﻿@using Scorebini.Data;
+
+<p>
+    <label>
+        Profile Name
+        <input @bind="Profile.ProfileName" />
+    </label>
+</p>
+<p>
+    <label>
+        Challonge Api Key
+        <input @bind="Profile.ChallongeApiKey" />
+    </label>
+    <a href="https://challonge.com/settings/developer" class="small" target="_blank">Challonge Settings</a>
+</p>
+<p>
+    <label>
+        Smash.gg Api Key
+        <input @bind="Profile.SmashggApiKey" />
+    </label>
+    <a href="https://start.gg/admin/profile/developer" class="small" target="_blank">Smashgg Dev Settings</a>
+</p>
+<p>
+    <label>
+        Enabled Prediction Streams
+        @foreach(var availableStream in ParentSettings.AllTwitchUsers)
+        {
+            <label for="@availableStream">
+            <input type="checkbox" id="@availableStream" checked="@(IsChecked(availableStream))"
+                @onchange="@((e) => CheckboxChanged(e, availableStream))"
+                />
+                @availableStream
+            </label>
+        }
+    </label>
+</p>
+
+@code {
+    [Parameter]
+    public SettingsProfile Profile { get; set; }
+    [Parameter]
+    public ScoreboardSettings ParentSettings { get; set; }
+
+    private string IsChecked(string id)
+    {
+        if(Profile.EnabledTwitchUsers.Contains(id))
+        {
+            return "checked";
+        }
+        return null;
+    }
+
+    private void CheckboxChanged(ChangeEventArgs e, string key)
+    {
+        bool chk = (bool)e.Value;
+        Profile.EnabledTwitchUsers.Remove(key);
+        if(chk)
+        {
+            Profile.EnabledTwitchUsers.Add(key);
+        }
+    }
+
+
+}

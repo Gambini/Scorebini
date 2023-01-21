@@ -36,6 +36,10 @@ namespace Scorebini.Data
                 {
                     Log?.LogInformation($"No file at {FullSettingsFilePath}, default initializing settings.");
                     CurrentSettings = new();
+                    CurrentSettings.Profiles.Add(new SettingsProfile()
+                    {
+                        ProfileName = "Default"
+                    });
                     return true;
                 }
                 else
@@ -50,6 +54,10 @@ namespace Scorebini.Data
                     }
                     else
                     {
+                        if (newSettings.Version == 0)
+                        {
+                            newSettings = UpgradeVersion0To1(newSettings);
+                        }
                         CurrentSettings = newSettings;
                         return true;
                     }
@@ -60,6 +68,21 @@ namespace Scorebini.Data
                 Log?.LogError(ex, $"Error loading settings: {ex.Message}");
                 return false;
             }
+        }
+
+        private ScoreboardSettings UpgradeVersion0To1(ScoreboardSettings v0)
+        {
+            Log?.LogInformation("Upgrading settings from version 0 to version 1.");
+            ScoreboardSettings ret = new();
+            ret.Version = 1;
+            ret.OutputDirectory = v0.OutputDirectory;
+            ret.UpdateIntervalSeconds = v0.UpdateIntervalSeconds;
+            SettingsProfile defaultProfile = new();
+            defaultProfile.ProfileName = "Default";
+            defaultProfile.ChallongeApiKey = v0.ChallongeApiKey;
+            defaultProfile.SmashggApiKey = v0.SmashggApiKey;
+            ret.Profiles.Add(defaultProfile);
+            return ret;
         }
 
         public bool SaveSettings(ScoreboardSettings newSettings)

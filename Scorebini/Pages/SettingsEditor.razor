@@ -18,20 +18,6 @@ else
 { 
     <p>
         <label>
-            Challonge Api Key
-            <input @bind="SBSettings.ChallongeApiKey" />
-        </label>
-        <a href="https://challonge.com/settings/developer" class="small" target="_blank">Challonge Settings</a>
-    </p>
-    <p>
-        <label>
-            Smash.gg Api Key
-            <input @bind="SBSettings.SmashggApiKey" />
-        </label>
-        <a href="https://start.gg/admin/profile/developer" class="small" target="_blank">Smashgg Dev Settings</a>
-    </p>
-    <p>
-        <label>
             Output Directory
             <input @bind="SBSettings.OutputDirectory" />
         </label>
@@ -43,6 +29,26 @@ else
             <input @bind="SBSettings.UpdateIntervalSeconds" />
         </label>
     </p>
+    <Select
+        TValue="int"
+        SelectedValue="@SBSettings.SelectedProfileIndex"
+        SelectedValueChanged="@OnSelectedProfileChanged"
+        >
+        @for(int i = 0; i < SBSettings.Profiles.Count; i++)
+        {
+            var profile = SBSettings.Profiles[i];
+            <SelectItem Value="@i">
+                @profile.ProfileName
+            </SelectItem>
+        }
+    </Select>
+    @if(SBSettings.GetSelectedProfile() != null)
+    {
+        <ProfileSettingsEditComponent
+            Profile="@(SBSettings.GetSelectedProfile())"
+            ParentSettings="@(SBSettings)"
+            />
+    }
     <button class="btn-primary" @onclick="SaveSettings">
         Save
     </button>
@@ -66,5 +72,11 @@ else
     private void SaveSettings()
     {
         SBSettingsService.SaveSettings(SBSettings);
+    }
+
+
+    void OnSelectedProfileChanged(int index)
+    {
+        SBSettings.SelectedProfileIndex = index;
     }
 }
