@@ -1,6 +1,140 @@
 ﻿@page "/twitchusers"
-<h3>TwitchUserEditor</h3>
+@using Scorebini.Data;
+@inject ScoreboardSettingsService SBSettingsService
+@inject TwitchIntegrationService TwitchService
+
+<h3>Scorebini Twitch Settings</h3>
+
+@if(!LoadResult.HasValue)
+{
+    <p><em>Loading...</em></p>
+}
+else if(LoadResult == false)
+{
+    <p><em>Error loading settings.</em></p>
+}
+else
+{ 
+    <p>
+        <label>
+            Scorebini Twitch API URL
+            <input @bind="SBSettings.ScorebiniTwitchApi" />
+        </label>
+        <div>
+            <button class="btn btn-primary" 
+                @onclick="(async () => await RunHealthCheck())"
+                disabled="@(ScorebiniHealthCheck == ScorebiniHealthCheckStatus.InProgress)">
+                Scorebini Twitch Api Health Check
+            </button>
+            @if(ScorebiniHealthCheck == ScorebiniHealthCheckStatus.NotRun)
+            {
+                <div> Click above to run health test. </div>
+            }
+            else if(ScorebiniHealthCheck == ScorebiniHealthCheckStatus.InProgress)
+            {
+                <div> Health check in progress </div>
+            }
+            else if(ScorebiniHealthCheck == ScorebiniHealthCheckStatus.Healthy)
+            {
+                <div> Healthy </div>
+            }
+            else if(ScorebiniHealthCheck == ScorebiniHealthCheckStatus.Unhealthy)
+            {
+                <div> Not Healthy </div>
+            }
+        </div>
+        <p>
+            <h3>Twitch Users</h3>
+        </p>
+
+        <div>
+            @for(int i = 0; i < SBSettings.AllTwitchUsers.Count; i++)
+            {
+                int index = i;
+                <TwitchUserSettingsComponent
+                    UserState="TwitchService.GetUser(SBSettings.AllTwitchUsers[index])"
+                    SBSettings="SBSettings"
+                    Index="index"
+                    OnDeleteClicked="RemoveUserButtonClicked"
+                    />
+            }
+            <button class="btn btn-secondary" @onclick="AddUserButtonClicked">
+                +
+            </button>
+        </div>
+        <div>
+            <button class="btn btn-primary" @onclick="SaveSettings">
+                Save
+            </button>
+        </div>
+    </p>
+}
 
 @code {
+    enum ScorebiniHealthCheckStatus
+    {
+        NotRun = 0,
+        InProgress,
+        Healthy,
+        Unhealthy
+    }
 
+    ScoreboardSettings SBSettings = new();
+    private bool? LoadResult;
+    private ScorebiniHealthCheckStatus ScorebiniHealthCheck = ScorebiniHealthCheckStatus.NotRun;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        LoadResult = SBSettingsService.LoadSettings();
+        if(LoadResult == true)
+        {
+            SBSettings = SBSettingsService.CurrentSettings;
+        }
+    }
+
+    private void SaveSettings()
+    {
+        // TODO: Need to get user name from current state
+        SBSettingsService.SaveSettings(SBSettings);
+    }
+
+    private async Task RunHealthCheck()
+    {
+        ScorebiniHealthCheck = ScorebiniHealthCheckStatus.InProgress;
+        try
+        {
+            bool healthy = await TwitchService.ScorebiniApiHealthCheck(SBSettings);
+            if(healthy)
+            {
+                ScorebiniHealthCheck = ScorebiniHealthCheckStatus.Healthy;
+            }
+            else
+            {
+                ScorebiniHealthCheck = ScorebiniHealthCheckStatus.Unhealthy;
+            }
+        }
+        catch(Exception)
+        {
+            ScorebiniHealthCheck = ScorebiniHealthCheckStatus.Unhealthy;
+        }
+    }
+
+
+    private void AddUserButtonClicked()
+    {
+        string baseName = "<twitch_login>";
+        string combinedName = baseName;
+        int uniqueIdx = 0;
+        while(SBSettings.AllTwitchUsers.Contains(combinedName))
+        {
+            combinedName = $"{baseName}{++uniqueIdx}";
+        }
+        SBSettings.AllTwitchUsers.Add(combinedName);
+    }
+
+    private void RemoveUserButtonClicked(int index)
+    {
+        SBSettings.AllTwitchUsers.RemoveAt(index);
+    }
 }

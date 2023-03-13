@@ -35,6 +35,7 @@ namespace Scorebini
             services.AddSingleton<ScoreboardSettingsService>();
             services.AddSingleton<TournamentService>();
             services.AddSingleton<CommentatorService>();
+            services.AddSingleton<TwitchIntegrationService>();
             services.AddBlazorise(options =>
             {
                 options.Immediate = true;

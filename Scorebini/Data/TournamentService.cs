@@ -173,7 +173,8 @@ namespace Scorebini.Data
                 ret.Errors.Add($"Score report had incorrect number of scores. Expected 2, got {report.Scores.Count}.");
             }
             var challongeMatch = report.Match as TournamentMatch;
-            using var request = new HttpRequestMessage(HttpMethod.Put, $"{TournamentsEndpoint}/{report.Tournament.Model.TournamentId}/matches/{challongeMatch.Id}.json?api_key={SBSettingsService.CurrentSettings?.ChallongeApiKey}");
+            string apiKey = SBSettingsService.CurrentSettings?.GetSelectedProfile()?.ChallongeApiKey ?? "";
+            using var request = new HttpRequestMessage(HttpMethod.Put, $"{TournamentsEndpoint}/{report.Tournament.Model.TournamentId}/matches/{challongeMatch.Id}.json?api_key={apiKey}");
 
             ChallongePushScoreBody bodyObj = new()
             {
@@ -244,7 +245,8 @@ namespace Scorebini.Data
 
             //using var request = new HttpRequestMessage(HttpMethod.Put, $"https://www.start.gg/api/-/rest/set/{report.Match.Id}/complete");
             using var request = new HttpRequestMessage(HttpMethod.Put, $"https://api.start.gg/set/{report.Match.Id}/complete");
-            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", SBSettingsService.CurrentSettings.SmashggApiKey);
+            string apiKey = SBSettingsService.CurrentSettings?.GetSelectedProfile()?.SmashggApiKey ?? "";
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
 
             var bodyObj = new SmashggPushScoreBody();
             int p1 = 0;
@@ -383,7 +385,8 @@ namespace Scorebini.Data
         public async Task<TournamentGetResponse> GetChallongeTournament(string tournamentId)
         {
             Log.LogDebug("Getting challonge tournament");
-            using var request = new HttpRequestMessage(HttpMethod.Get, $"{TournamentsEndpoint}/{tournamentId}.json?api_key={SBSettingsService.CurrentSettings?.ChallongeApiKey}&include_participants=1&include_matches=1");
+            string apiKey = SBSettingsService?.CurrentSettings?.GetSelectedProfile()?.ChallongeApiKey;
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{TournamentsEndpoint}/{tournamentId}.json?api_key={apiKey}&include_participants=1&include_matches=1");
 
             TournamentGetResponse ret = new();
 
@@ -459,7 +462,8 @@ namespace Scorebini.Data
         {
             SmashggPostResponse ret = new();
             using var request = new HttpRequestMessage(HttpMethod.Post, $"{SmashggEndpoint}");
-            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", SBSettingsService.CurrentSettings.SmashggApiKey);
+            string apiKey = SBSettingsService.CurrentSettings?.GetSelectedProfile().SmashggApiKey;
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
             Data.Smash.gg.SmashGraphQLQuery queryObject = new();
             queryObject.Query = Smash.gg.FullEventQuery.FullQuery;
             queryObject.Variables = new()

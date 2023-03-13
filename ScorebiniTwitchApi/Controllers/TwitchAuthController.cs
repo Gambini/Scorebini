@@ -12,6 +12,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Web;
+using ScorebiniTwitchApi.Shared.Responses;
 
 namespace ScorebiniTwitchApi.Controllers
 {
@@ -73,10 +74,14 @@ namespace ScorebiniTwitchApi.Controllers
         internal async Task<ApiResult<TwitchUserResponse?>> GetTwitchUserInfo(string login)
         {
             string uri = QueryHelpers.AddQueryString(@"https://api.twitch.tv/helix/users", "login", login);
-            HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Get, uri);
-            req.Headers.Add("Client-Id", TwitchConfig.CurrentValue.AppClientId);
+            var makeRequestFn = () =>
+            {
+                HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Get, uri);
+                req.Headers.Add("Client-Id", TwitchConfig.CurrentValue.AppClientId);
+                return req;
+            };
             var client = HttpFactory.CreateClient("TwitchUserIdRequest");
-            var response = await AppTokenService.SendAsyncWithAuthRetry(client, req, HttpContext.RequestAborted);
+            var response = await AppTokenService.SendAsyncWithAuthRetry(client, makeRequestFn, HttpContext.RequestAborted);
             var responseStr = await response.Content.ReadAsStringAsync(HttpContext.RequestAborted);
             Log.LogDebug("User response for login {login}: ({httpCode}) {response}", login, (int)response.StatusCode, responseStr);
             if (response.IsSuccessStatusCode)
@@ -85,7 +90,7 @@ namespace ScorebiniTwitchApi.Controllers
                 if (userResponse == null)
                 {
                     Log.LogError("Unable to parse TwitchUserResponse from response '{response}'", responseStr);
-                    return new ApiResult<TwitchUserResponse?>(null, response.StatusCode, "Unable to parse response");
+                    return new ApiResult<TwitchUserResponse?>(null, StatusCodes.Status500InternalServerError, "Unable to parse response");
                 }
                 return new ApiResult<TwitchUserResponse?>(userResponse, response.StatusCode, "Success");
             }
@@ -102,7 +107,7 @@ namespace ScorebiniTwitchApi.Controllers
 
         [Route("AuthUser")]
         [HttpGet]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(TwitchUser))]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(BasicResponse))]
         [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(BasicResponse))]
         [ProducesResponseType(StatusCodes.Status303SeeOther, Type = typeof(AuthorizeRedirectResponse))]
         [ProducesResponseType(StatusCodes.Status429TooManyRequests, Type = typeof(BasicResponse))]

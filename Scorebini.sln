@@ -7,6 +7,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Scorebini", "Scorebini\Scor
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ScorebiniTwitchApi", "ScorebiniTwitchApi\ScorebiniTwitchApi.csproj", "{2B77A86F-352B-486B-A646-787D65E19B1F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ScorebiniTwitchApi.Shared", "ScorebiniTwitchApi.Shared\ScorebiniTwitchApi.Shared.csproj", "{6ABCD0A5-6045-4FAD-B014-89EC81654FAB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{2B77A86F-352B-486B-A646-787D65E19B1F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2B77A86F-352B-486B-A646-787D65E19B1F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2B77A86F-352B-486B-A646-787D65E19B1F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6ABCD0A5-6045-4FAD-B014-89EC81654FAB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6ABCD0A5-6045-4FAD-B014-89EC81654FAB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6ABCD0A5-6045-4FAD-B014-89EC81654FAB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6ABCD0A5-6045-4FAD-B014-89EC81654FAB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

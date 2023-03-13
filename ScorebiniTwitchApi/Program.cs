@@ -22,8 +22,17 @@ namespace ScorebiniTwitchApi
             builder.Services.AddSwaggerGen(
                 options =>
                 {
-                    var xmlFilename = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
-                    options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, xmlFilename));
+                    var dllFiles = Directory.GetFiles(AppContext.BaseDirectory, "*.dll").ToHashSet();
+                    var xmlFiles = Directory.GetFiles(AppContext.BaseDirectory, "*.xml");
+                    // Usually there are fewer xml files than dll files, so iterate over that instead.
+                    foreach (var xmlFile in xmlFiles)
+                    {
+                        string asDllFile = Path.ChangeExtension(xmlFile, ".dll");
+                        if(dllFiles.Contains(asDllFile))
+                        {
+                            options.IncludeXmlComments(xmlFile);
+                        }
+                    }
                 }
             );
 

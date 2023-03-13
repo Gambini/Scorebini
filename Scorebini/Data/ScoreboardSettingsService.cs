@@ -79,8 +79,10 @@ namespace Scorebini.Data
             ret.UpdateIntervalSeconds = v0.UpdateIntervalSeconds;
             SettingsProfile defaultProfile = new();
             defaultProfile.ProfileName = "Default";
+#pragma warning disable CS0618 // Type or member is obsolete
             defaultProfile.ChallongeApiKey = v0.ChallongeApiKey;
             defaultProfile.SmashggApiKey = v0.SmashggApiKey;
+#pragma warning restore CS0618 // Type or member is obsolete
             ret.Profiles.Add(defaultProfile);
             return ret;
         }

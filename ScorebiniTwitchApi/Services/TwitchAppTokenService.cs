@@ -66,20 +66,23 @@ namespace ScorebiniTwitchApi.Services
         /// This function sets the Authorization header.
         /// </summary>
         /// <param name="client"></param>
-        /// <param name="request"></param>
+        /// <param name="makeRequestFn"></param>
         /// <param name="cancelToken"></param>
         /// <returns></returns>
-        public async Task<HttpResponseMessage> SendAsyncWithAuthRetry(HttpClient client, HttpRequestMessage request, CancellationToken cancelToken)
+        public async Task<HttpResponseMessage> SendAsyncWithAuthRetry(HttpClient client, Func<HttpRequestMessage> makeRequestFn, CancellationToken cancelToken)
         {
             string appToken = await GetOrRequestCurrentToken(cancelToken);
+            var request = makeRequestFn();
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", appToken);
             var response = await client.SendAsync(request, cancelToken);
             if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
                 Log.LogInformation("App token became invalid.");
+                response.Dispose(); // dispose here because we don't have a `using` statement
                 string newToken = await ForceUpdateCurrentToken(cancelToken);
-                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", newToken);
-                return await client.SendAsync(request);
+                var request2 = makeRequestFn(); // you are not supposed to re-use HttpRequestMessage objects, so create a new one
+                request2.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", newToken);
+                return await client.SendAsync(request2);
             }
             return response;
         }
@@ -97,7 +100,7 @@ namespace ScorebiniTwitchApi.Services
         private async Task<string> RequestNewToken(CancellationToken cancelToken)
         {
             Log.LogDebug("Requesting new app token");
-            var req = new HttpRequestMessage(HttpMethod.Post, TWITCH_TOKEN_URL);
+            using var req = new HttpRequestMessage(HttpMethod.Post, TWITCH_TOKEN_URL);
             Dictionary<string, string> postData = new()
             {
                 { "client_id", TwitchConfig.CurrentValue.AppClientId },
@@ -106,7 +109,7 @@ namespace ScorebiniTwitchApi.Services
             };
             req.Content = new FormUrlEncodedContent(postData);
             using var client = HttpFactory.CreateClient("AppTokenRequest");
-            var resp = await client.SendAsync(req, cancelToken);
+            using var resp = await client.SendAsync(req, cancelToken);
             var respStr = await resp.Content.ReadAsStringAsync(cancelToken);
             if (resp.IsSuccessStatusCode)
             {

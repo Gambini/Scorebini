@@ -18,15 +18,18 @@ namespace Scorebini.Data
         /// <summary>
         /// Only used for upgrading from version 0, do not use
         /// </summary>
+        [Obsolete("Use GetSelectedProfile().ChallongeApiKey")]
         public string ChallongeApiKey { get; set; }
         public string OutputDirectory { get; set; } = "output";
         public int UpdateIntervalSeconds { get; set; } = 30;
         /// <summary>
         /// Only used for upgrading from version 0, do not use
         /// </summary>
+        [Obsolete("Use GetSelectedProfile().SmashggApiKey")]
         public string SmashggApiKey { get; set; }
         public int Version { get; set; } = 0;
         public int SelectedProfileIndex { get; set; } = 0;
+        public string ScorebiniTwitchApi { get; set; } = @"https://scorebini.com";
         public List<string> AllTwitchUsers { get; set; } = new();
         public List<SettingsProfile> Profiles { get; set; } = new();
 

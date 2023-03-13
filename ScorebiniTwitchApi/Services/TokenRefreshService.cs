@@ -49,6 +49,27 @@ namespace ScorebiniTwitchApi.Services
             return Task.CompletedTask;
         }
 
+
+        /// <summary>
+        /// Queue up a token refresh on a background thread. Does not return the result. Use
+        /// <see cref="RefreshToken(Guid)"/> if you want the result of the refresh.
+        /// </summary>
+        internal void RefreshTokenFireAndForget(Guid scorebiniUserId)
+        {
+            Task.Run(async () =>
+            {
+                try
+                {
+                    await RefreshToken(scorebiniUserId);
+                }
+                catch (Exception ex)
+                {
+                    Log.LogError(ex, "Exception refreshing token. Message: {msg}", ex.Message);
+                }
+
+            });
+        }
+
         internal async Task<ApiResult<TwitchTokenInfo?>> RefreshToken(Guid scorebiniUserId)
         {
             if (ShutdownTokenSource.IsCancellationRequested)
@@ -139,7 +160,7 @@ namespace ScorebiniTwitchApi.Services
                 { "refresh_token", user.TokenInfo.RefreshToken }
             };
             request.Content = new FormUrlEncodedContent(refreshRequestValues);
-            var client = httpFactory.CreateClient("RefreshToken");
+            using var client = httpFactory.CreateClient("RefreshToken");
             using var response = await client.SendAsync(request, ShutdownTokenSource.Token);
             var responseStr = await response.Content.ReadAsStringAsync();
             Log.LogDebug("User {user} refresh token response: {response}", userLogName, responseStr);

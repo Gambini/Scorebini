@@ -1,0 +1,107 @@
+﻿
+@using Scorebini.Data;
+@using ScorebiniTwitchApi.Shared;
+
+@inject TwitchIntegrationService TwitchService;
+
+<div>
+    <label>
+        Twitch Username
+        <input type="text" value="@UserState.Login" @onchange="LoginValueChanged" />
+    </label>
+    @if(UserState.MostRecentError != null)
+    {
+        <div class="alert alert-danger">
+            @UserState.MostRecentError
+        </div>
+    }
+    @if(UserState.MostRecentResponseMeta != null)
+    {
+        <div>
+            Meta Info:
+            <div>
+                Code: @UserState.MostRecentResponseMeta.Code
+            </div>
+            <div>
+                Message: '@UserState.MostRecentResponseMeta.Message'
+            </div>
+        </div>
+    }
+    <div>
+        State: @UserState.State
+    </div>
+    <button class="btn btn-primary" @onclick="(async () => await AuthClicked())" 
+        disabled="@(UserState.State == ScorebiniTwitchUserState.RequestInProgres)">
+        Auth
+    </button>
+    <button class="btn btn-danger" @onclick="(async () => await RemoveClicked())">
+        -
+    </button>
+    <button class="btn btn-secondary" @onclick="(async () => await GetCurrentPredictionClicked())">
+        ?
+    </button>
+    <button class="btn btn-secondary" @onclick="(async () => await TestCreatePrediction())">
+        Test Create Prediction
+    </button>
+</div>
+
+@code {
+    [Parameter]
+    public TwitchUserState UserState { get; set; }
+    [Parameter]
+    public ScoreboardSettings SBSettings { get; set; }
+    [Parameter]
+    public int Index { get; set; }
+    [Parameter]
+    public EventCallback<int> OnDeleteClicked { get; set; }
+
+
+    private async Task AuthClicked()
+    {
+        SBSettings.AllTwitchUsers[Index] = UserState.Login;
+        await TwitchService.AuthUser(UserState, SBSettings);
+        this.StateHasChanged();
+    }
+
+    private async Task RemoveClicked()
+    {
+        await OnDeleteClicked.InvokeAsync(Index);
+    }
+
+    private async Task GetCurrentPredictionClicked()
+    {
+        var predResp = await TwitchService.GetCurrentPrediction(SBSettings, UserState.Login);
+        TwitchService.GetUser(UserState.Login).CurrentPrediction = predResp;
+        if(predResp.Meta.Code != 200)
+        {
+            UserState.State = ScorebiniTwitchUserState.Error;
+            UserState.MostRecentError = predResp.Meta.Message;
+        }
+    }
+
+    private async Task TestCreatePrediction()
+    {
+        var req = new ScorebiniTwitchApi.Shared.Requests.CreatePrediction(
+            UserState.Login,
+            "Test Prediction",
+            new()
+            {
+                new("Test1"),
+                new("Test2"),
+            },
+            30
+        );
+        var resp = await TwitchService.CreatePrediction(SBSettings, req);
+        if(resp.Meta.Code != 200)
+        {
+            UserState.State = ScorebiniTwitchUserState.Error;
+            UserState.MostRecentError = resp.Meta.Message;
+        }
+    }
+
+    private void LoginValueChanged(ChangeEventArgs e)
+    {
+        UserState.Login = e.Value.ToString();
+        SBSettings.AllTwitchUsers[Index] = UserState.Login;
+    }
+}

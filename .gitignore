@@ -14,3 +14,5 @@
 /ScorebiniTwitchApi/bin
 /ScorebiniTwitchApi/obj
 /ScorebiniTwitchApi/twitch_tokens.db
+/ScorebiniTwitchApi.Shared/obj
+/ScorebiniTwitchApi.Shared/bin

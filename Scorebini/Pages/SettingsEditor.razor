@@ -29,6 +29,12 @@ else
             <input @bind="SBSettings.UpdateIntervalSeconds" />
         </label>
     </p>
+    <p>
+        <label>
+            Scorebini Twitch API URL
+            <input @bind="SBSettings.ScorebiniTwitchApi" />
+        </label>
+    </p>
     <Select
         TValue="int"
         SelectedValue="@SBSettings.SelectedProfileIndex"
