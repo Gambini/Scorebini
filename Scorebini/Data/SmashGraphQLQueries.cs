@@ -3,35 +3,6 @@ using System.Collections.Generic;
 
 namespace Scorebini.Data.Smash.gg
 {
-    /**
-     * 
-     * 
-     * To Start:
-     * 
-     query EventQuery($slug: String) {
-		event(slug: $slug){
-			id
-			name
-    	sets {
-        nodes {
-          id
-          round
-          fullRoundText
-          state
-          slots {
-            entrant {
-              id
-              name
-            }
-            
-          }
-          
-        }
-      }
-		}
-	}
-     */
-
     public enum SetState
     {
         Unknown = 0,
@@ -119,7 +90,7 @@ namespace Scorebini.Data.Smash.gg
         public PageInfo PageInfo { get; set; }
 
         [JsonProperty("nodes")]
-        public IList<Set> Nodes { get; set; }
+        public List<Set> Nodes { get; set; }
     }
 
 
@@ -144,11 +115,17 @@ namespace Scorebini.Data.Smash.gg
     public static class FullEventQuery
     {
         public static string FullQuery = @"
-query EventQuery($slug: String) {
+query EventQuery($slug: String, $setPage: Int, $setsPerPage: Int) {
   event(slug: $slug){
     id
     name
-      sets {
+      sets (page: $setPage, perPage: $setsPerPage, filters: {hideEmpty: true}) {
+      pageInfo {
+        total
+        page
+        totalPages
+        perPage
+      }
       nodes {
         id
         round

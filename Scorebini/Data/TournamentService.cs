@@ -457,6 +457,35 @@ namespace Scorebini.Data
 
         public async Task<SmashggPostResponse> GetSmashggTournament(string tournamentId)
         {
+            SmashggPostResponse firstPage = await GetSmashggTournament(tournamentId, 1);
+            if(firstPage.RequestErrors.Count > 0)
+            {
+                return firstPage;
+            }
+            var firstPageSetConnection = firstPage.Data?.Event?.SetConnection;
+            if(firstPageSetConnection == null)
+            {
+                return firstPage;
+            }
+            int? totalPages = firstPageSetConnection.PageInfo?.TotalPages;
+            if (totalPages > 1)
+            {
+                for (int i = 2; i <= totalPages; i++)
+                {
+                    SmashggPostResponse nextPage = await GetSmashggTournament(tournamentId, i);
+                    var newNodes = nextPage.Data?.Event?.SetConnection?.Nodes;
+                    if (newNodes != null)
+                    {
+                        firstPageSetConnection.Nodes.AddRange(newNodes);
+                    }
+                    firstPage.RequestErrors.AddRange(nextPage.RequestErrors);
+                }
+            }
+            return firstPage;
+        }
+
+        public async Task<SmashggPostResponse> GetSmashggTournament(string tournamentId, int page)
+        {
             SmashggPostResponse ret = new();
             using var request = new HttpRequestMessage(HttpMethod.Post, $"{SmashggEndpoint}");
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", SBSettingsService.CurrentSettings.SmashggApiKey);
@@ -464,8 +493,12 @@ namespace Scorebini.Data
             queryObject.Query = Smash.gg.FullEventQuery.FullQuery;
             queryObject.Variables = new()
             {
-                { "slug", tournamentId }
+                { "slug", tournamentId },
+                { "setPage", page.ToString() },
+                { "setsPerPage", 98.ToString() }
             };
+
+            Log.LogInformation("Querying smash.gg with params: ${Params}", queryObject.Variables);
             request.Content = new StringContent(JsonConvert.SerializeObject(queryObject), System.Text.Encoding.UTF8, "application/json");
 
             using var client = HttpFactory.CreateClient();
