@@ -1,0 +1,3 @@
+- Switch screen should be just two separate buttons
+- Integrate with smash.gg
+- Integrate with braacket
