@@ -136,7 +136,7 @@
     {
         PlayerState = newState;
         ScoreComp?.SetScore(newState.Score);
-        SelectedId = new MatchOrParticipantId(MatchOrParticipant.Participant, newState.Id ?? 0);
+        SelectedId = new MatchOrParticipantId(MatchOrParticipant.Participant, newState.Id.HasValue ? newState.Id : new());
         StateHasChanged();
     }
 
@@ -164,7 +164,7 @@
         if(ForceSyncSelection)
         {
             ForceSyncSelection = false;
-            SelectedId = new MatchOrParticipantId(MatchOrParticipant.Participant, PlayerState.Id ?? 0);
+            SelectedId = new MatchOrParticipantId(MatchOrParticipant.Participant, PlayerState.Id.HasValue ? PlayerState.Id : new());
             StateHasChanged();
         }
     }

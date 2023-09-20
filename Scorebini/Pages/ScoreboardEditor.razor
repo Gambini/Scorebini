@@ -28,14 +28,21 @@
     {
         foreach(var errStr in ContextUpdateErrors)
         {
-            <p class="text-danger">@errStr</p>
+            <TournamentAlertMessage Color="Color.Danger" Message="@errStr" Visible=true />
         }
     }
     @if(PushScoreErrors != null)
     {
         foreach(var errStr in PushScoreErrors)
         {
-            <p class="text-danger">@errStr</p>
+            <TournamentAlertMessage Color="Color.Danger" Message="@errStr" Visible=true />
+        }
+    }
+    @if(ContextUpdateWarnings != null)
+    {
+        foreach(var errStr in ContextUpdateWarnings)
+        {
+            <TournamentAlertMessage Color="Color.Warning" Message="@errStr" Visible=true />
         }
     }
 </p>
@@ -112,10 +119,11 @@
 
     bool _isUpdatingContext = false;
     bool DisableUpdateButton => string.IsNullOrWhiteSpace(InputState.Url) || _isUpdatingContext;
-    bool CanPushScore => (InputState.MatchId.HasValue == true) && (Tournament?.Model?.TournamentHost == TournamentHost.Challonge) && (Tournament?.IsValidMatchId(InputState.MatchId.Value) == true);
+    bool CanPushScore => (InputState.MatchId.HasValue == true) && (Tournament?.Model?.TournamentHost == TournamentHost.Challonge) && (Tournament?.IsValidMatchId(InputState.MatchId) == true);
 
     List<string> ContextUpdateErrors = null;
     List<string> PushScoreErrors = null;
+    List<string> ContextUpdateWarnings = null;
 
     TournamentView Tournament = null;
     CommentatorList Commentators = null;
@@ -181,6 +189,7 @@
             Tournament = new TournamentView(context);
             ContextUpdateErrors = null;
         }
+        ContextUpdateWarnings = context?.Warnings;
         _isUpdatingContext = false;
         PrevUpdateTime = DateTime.UtcNow;
         StateHasChanged();
@@ -198,11 +207,11 @@
             && InputState.Player2?.Id.HasValue == true)
         {
             MatchScoreReport report = new MatchScoreReport();
-            if(Tournament.Matches.TryGetValue(InputState.MatchId.Value, out var match))
+            if(Tournament.Matches.TryGetValue(InputState.MatchId, out var match))
             {
                 report.Match = match;
             }
-            if (Tournament.Participants.TryGetValue(InputState.Player1.Id.Value, out var p1))
+            if (Tournament.Participants.TryGetValue(InputState.Player1.Id, out var p1))
             {
                 report.Scores.Add(new MatchScoreReport.Score()
                 {
@@ -210,7 +219,7 @@
                     Wins = InputState.Player1.Score
                 });
             }
-            if (Tournament.Participants.TryGetValue(InputState.Player2.Id.Value, out var p2))
+            if (Tournament.Participants.TryGetValue(InputState.Player2.Id, out var p2))
             {
                 report.Scores.Add(new MatchScoreReport.Score()
                 {
@@ -284,7 +293,7 @@
 
     public Task OnPlayerSelected(PlayerInputPlayerSelectedEventArgs _)
     {
-        InputState.MatchId = null;
+        InputState.MatchId = new();
         return Task.CompletedTask;
     }
 

@@ -11,3 +11,6 @@
 /.vscode
 /Scorebini/Config
 /publish
+/.vs
+/Scorebini/Properties/PublishProfiles/FolderProfile.pubxml.user
+*csproj.user

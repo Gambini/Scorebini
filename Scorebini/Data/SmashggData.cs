@@ -9,7 +9,7 @@ namespace Scorebini.Data.Smash.gg
         public Entrant Model { get; private set; }
 
         public string Name => Model.Name;
-        public long Id => Model.Id;
+        public StringOrIntId Id => Model.Id;
 
         public TournamentParticipant(Entrant model)
         {
@@ -21,7 +21,7 @@ namespace Scorebini.Data.Smash.gg
     public class TournamentMatch : ITournamentMatch
     {
         public Set Model { get; private set; }
-        public long Id => Model.Id;
+        public StringOrIntId Id => Model.Id;
 
         public TournamentParticipant Player1 { get; set; } = null;
         public TournamentParticipant Player2 { get; set; } = null;

@@ -1,0 +1,23 @@
+﻿<Alert Color="@Color" Visible="@Visible">
+    <AlertMessage>
+        @Message
+    </AlertMessage>
+    <CloseButton Clicked="@OnClicked" />
+</Alert>
+
+@code {
+    [Parameter]
+    public string Message { get; set; }
+    [Parameter]
+    public Blazorise.Color Color { get; set; }
+    // This needs to be a property and set to true so that the visibility is not
+    // cached between multiple requests.
+    [Parameter]
+    public bool Visible { get; set; } = true;
+
+    Task OnClicked()
+    {
+        Visible = false;
+        return Task.CompletedTask;
+    }
+}

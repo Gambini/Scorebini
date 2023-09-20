@@ -155,7 +155,7 @@ namespace Scorebini.Data
                 [JsonProperty("scores_csv")]
                 public string ScoresCsv { get; set; }
                 [JsonProperty("winner_id")]
-                public long WinnerId { get; set; }
+                public StringOrIntId WinnerId { get; set; }
             }
             [JsonProperty("match")]
             public MatchObject Match { get; set; }
@@ -215,11 +215,11 @@ namespace Scorebini.Data
         class SmashggPushScoreBody
         {
             [JsonProperty("entrant1Id")]
-            public long Entrant1Id { get; set; }
+            public StringOrIntId Entrant1Id { get; set; }
             [JsonProperty("entrant1Score")]
             public int Entrant1Score { get; set; }
             [JsonProperty("entrant2Id")]
-            public long Entrant2Id { get; set; }
+            public StringOrIntId Entrant2Id { get; set; }
             [JsonProperty("entrant2Score")]
             public int Entrant2Score { get; set; }
         }

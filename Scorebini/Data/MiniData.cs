@@ -1,4 +1,6 @@
 ﻿using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
 
 namespace Scorebini.Data
 {
@@ -25,22 +27,22 @@ namespace Scorebini.Data
     public struct MatchOrParticipantId : System.IEquatable<MatchOrParticipantId>
     {
         public MatchOrParticipant Type { get; set; } = MatchOrParticipant.Match;
-        public long Id { get; set; }
+        public StringOrIntId Id { get; set; }
 
         public MatchOrParticipantId()
         {
             Type = MatchOrParticipant.Match;
-            Id = 0;
+            Id = new();
         }
 
         public MatchOrParticipantId(string jsonStr)
         {
             MatchOrParticipantId? ret = JsonConvert.DeserializeObject<MatchOrParticipantId>(jsonStr);
             Type = ret?.Type ?? MatchOrParticipant.Match;
-            Id = ret?.Id ?? 0;
+            Id = ret?.Id ?? new();
         }
 
-        public MatchOrParticipantId(MatchOrParticipant type, long id)
+        public MatchOrParticipantId(MatchOrParticipant type, StringOrIntId id)
         {
             Type = type;
             Id = id;
@@ -90,4 +92,5 @@ namespace Scorebini.Data
             return !(left == right);
         }
     }
+
 }

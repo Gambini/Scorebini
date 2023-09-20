@@ -30,7 +30,10 @@ namespace Scorebini.Data
         public string FullUrl { get; set; } 
         // Does not include https://, pretty much just the tournamentId part
         [JsonProperty("url")]
-        public string UrlId { get; set; } 
+        public string UrlId { get; set; }
+        // Will be "pending" if not started, "underway" if it is started
+        [JsonProperty("state")]
+        public string State { get; set; }
 
         [JsonProperty("participants")]
         public IList<ParticipantEntry> Participants { get; set; }

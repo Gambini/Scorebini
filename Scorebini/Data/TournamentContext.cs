@@ -64,6 +64,7 @@ namespace Scorebini.Data
 
 
         public List<string> RequestErrors { get; set; } = new();
+        public List<string> Warnings { get; set; } = new();
 
         public bool IsValid => TournamentHost != TournamentHost.Unknown && (Challonge?.IsValid == true || Smashgg?.IsValid == true);
 
@@ -94,6 +95,10 @@ namespace Scorebini.Data
                 "round robin" => TournamentElimType.RoundRobin,
                 _ => TournamentElimType.DoubleElim,// sure, why not default to double elim
             };
+            if (Challonge.Tournament?.State == "pending")
+            {
+                Warnings.Add("Tournament has not started yet. You may see incorrect information.");
+            }
         }
 
 
@@ -118,6 +123,10 @@ namespace Scorebini.Data
             }
             // TODO: Find this information somehow
             ElimType = TournamentElimType.DoubleElim;
+            if (Smashgg.Tournament?.State != "ACTIVE")
+            {
+                Warnings.Add("Tournament has not started yet. You may see incorrect information.");
+            }
         }
     }
 
@@ -126,7 +135,7 @@ namespace Scorebini.Data
     {
         public ChallongeParticipant Model { get; private set; }
         public string Name => Model.Name;
-        public long Id => Model.Id.Value;
+        public StringOrIntId Id => Model.Id;
 
         public ChallongeTournamentParticipant(ChallongeParticipant model)
         {
@@ -144,7 +153,7 @@ namespace Scorebini.Data
     public class TournamentMatch : ITournamentMatch
     {
         public ChallongeMatch Model { get; set; }
-        public long Id => Model.Id.Value;
+        public StringOrIntId Id => Model.Id;
         public ChallongeTournamentParticipant Player1 { get; set; } = null;
         public ChallongeTournamentParticipant Player2 { get; set; } = null;
         public MatchStatus Status { get; set; } = MatchStatus.Unknown;
@@ -177,11 +186,11 @@ namespace Scorebini.Data
                 Model = model,
                 Status = StatusFromString(model.State)
             };
-            if(ret.Model.Player1Id.HasValue && tournament.Participants.TryGetValue(ret.Model.Player1Id.Value, out var player1))
+            if(ret.Model.Player1Id.HasValue && tournament.Participants.TryGetValue(ret.Model.Player1Id, out var player1))
             {
                 ret.Player1 = player1 as ChallongeTournamentParticipant;
             }
-            if(ret.Model.Player2Id.HasValue && tournament.Participants.TryGetValue(ret.Model.Player2Id.Value, out var player2))
+            if(ret.Model.Player2Id.HasValue && tournament.Participants.TryGetValue(ret.Model.Player2Id, out var player2))
             {
                 ret.Player2 = player2 as ChallongeTournamentParticipant;
             }
@@ -247,8 +256,8 @@ namespace Scorebini.Data
         public string Url => Model.Url;
         public TournamentContext Model { get; set; }
         public string Id => Model.TournamentId;
-        public Dictionary<long, ITournamentParticipant> Participants { get; } = new();
-        public Dictionary<long, ITournamentMatch> Matches { get; } = new();
+        public Dictionary<StringOrIntId, ITournamentParticipant> Participants { get; } = new();
+        public Dictionary<StringOrIntId, ITournamentMatch> Matches { get; } = new();
         public List<ITournamentParticipant> AlphabeticalParticipants { get; } = new();
 
         public TournamentView(TournamentContext model)
@@ -263,7 +272,7 @@ namespace Scorebini.Data
                 {
                     if (partModel.Id.HasValue)
                     {
-                        Participants.Add(partModel.Id.Value, new ChallongeTournamentParticipant(partModel));
+                        Participants.Add(partModel.Id, new ChallongeTournamentParticipant(partModel));
                     }
                 }
 
@@ -274,7 +283,7 @@ namespace Scorebini.Data
                 {
                     if (matchModel.Id.HasValue)
                     {
-                        Matches.Add(matchModel.Id.Value, TournamentMatch.Create(this, matchModel));
+                        Matches.Add(matchModel.Id, TournamentMatch.Create(this, matchModel));
                     }
                 }
             }
@@ -301,9 +310,9 @@ namespace Scorebini.Data
         }
 
 
-        public bool IsValidMatchId(long id)
+        public bool IsValidMatchId(StringOrIntId id)
         {
-            return Matches?.ContainsKey(id) == true;
+            return id.HasValue && Matches?.ContainsKey(id) == true;
         }
     }
 }

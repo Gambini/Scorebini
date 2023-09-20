@@ -30,10 +30,13 @@ namespace Scorebini.Data.Smash.gg
 
     public class Event
     {
-        [JsonProperty("id")]
-        public long Id { get; set; }
+        [JsonProperty("id"), JsonConverter(typeof(StringOrIntIdConverter))]
+        public StringOrIntId Id { get; set; }
         [JsonProperty("name")]
         public string Name { get; set; }
+        // CREATED, ACTIVE, COMPLETED, READY, INVALID, CALLED, QUEUED
+        [JsonProperty("state")]
+        public string State { get; set; }
         [JsonProperty("sets")]
         public SetConnection SetConnection { get; set; }
     }
@@ -57,8 +60,8 @@ namespace Scorebini.Data.Smash.gg
 
     public class Entrant
     {
-        [JsonProperty("id")]
-        public long Id { get; set; }
+        [JsonProperty("id"), JsonConverter(typeof(StringOrIntIdConverter))]
+        public StringOrIntId Id { get; set; }
         [JsonProperty("name")]
         public string Name { get; set; }
     }
@@ -72,8 +75,8 @@ namespace Scorebini.Data.Smash.gg
 
     public class Set
     {
-        [JsonProperty("id")]
-        public long Id { get; set; }
+        [JsonProperty("id"), JsonConverter(typeof(StringOrIntIdConverter))]
+        public StringOrIntId Id { get; set; }
         [JsonProperty("fullRoundText")]
         public string FullRoundText { get; set; }
         [JsonProperty("round")]
@@ -119,6 +122,7 @@ query EventQuery($slug: String, $setPage: Int, $setsPerPage: Int) {
   event(slug: $slug){
     id
     name
+    state
       sets (page: $setPage, perPage: $setsPerPage, filters: {hideEmpty: true}) {
       pageInfo {
         total
