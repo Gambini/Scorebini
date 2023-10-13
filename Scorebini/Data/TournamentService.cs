@@ -171,6 +171,7 @@ namespace Scorebini.Data
             {
                 ret.Success = false;
                 ret.Errors.Add($"Score report had incorrect number of scores. Expected 2, got {report.Scores.Count}.");
+                return ret;
             }
             var challongeMatch = report.Match as TournamentMatch;
             using var request = new HttpRequestMessage(HttpMethod.Put, $"{TournamentsEndpoint}/{report.Tournament.Model.TournamentId}/matches/{challongeMatch.Id}.json?api_key={SBSettingsService.CurrentSettings?.ChallongeApiKey}");
@@ -209,77 +210,6 @@ namespace Scorebini.Data
                 ret.Errors.Add($"Http response error when updating challonge match. Status {response.StatusCode} ({(int)response.StatusCode}). See logs.");
                 return ret;
             }
-        }
-
-
-        class SmashggPushScoreBody
-        {
-            [JsonProperty("entrant1Id")]
-            public StringOrIntId Entrant1Id { get; set; }
-            [JsonProperty("entrant1Score")]
-            public int Entrant1Score { get; set; }
-            [JsonProperty("entrant2Id")]
-            public StringOrIntId Entrant2Id { get; set; }
-            [JsonProperty("entrant2Score")]
-            public int Entrant2Score { get; set; }
-        }
-
-        /// <summary>
-        /// Note: This will always 403 asking for login.
-        /// No documentation on how to do so.
-        /// It was reverse engineered from network debugger so probably missing something important.
-        /// </summary>
-        /// <param name="report"></param>
-        /// <returns></returns>
-        public async Task<PushScoreResponse> PushSmashggScore(MatchScoreReport report)
-        {
-            PushScoreResponse ret = new PushScoreResponse();
-            ret.Success = false;
-            Log.LogDebug("Updating Smashgg match {}", report.Match?.Id);
-            if (report.Scores.Count != 2)
-            {
-                ret.Success = false;
-                ret.Errors.Add($"Score report had incorrect number of scores. Expected 2, got {report.Scores.Count}.");
-            }
-
-            //using var request = new HttpRequestMessage(HttpMethod.Put, $"https://www.start.gg/api/-/rest/set/{report.Match.Id}/complete");
-            using var request = new HttpRequestMessage(HttpMethod.Put, $"https://api.start.gg/set/{report.Match.Id}/complete");
-            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", SBSettingsService.CurrentSettings.SmashggApiKey);
-
-            var bodyObj = new SmashggPushScoreBody();
-            int p1 = 0;
-            int p2 = 1;
-            if (report.Scores[0].Player.Id == report.Match.Player2.Id)
-            {
-                p1 = 1;
-                p2 = 0;
-            }
-            bodyObj.Entrant1Id = report.Scores[p1].Player.Id;
-            bodyObj.Entrant1Score = report.Scores[p1].Wins;
-            bodyObj.Entrant2Id = report.Scores[p2].Player.Id;
-            bodyObj.Entrant2Score = report.Scores[p2].Wins;
-
-            string bodyJson = JsonConvert.SerializeObject(bodyObj);
-            request.Content = new StringContent(bodyJson, System.Text.Encoding.UTF8, "application/json");
-
-
-            Log.LogInformation("Sending request {} body {}", request, bodyJson);
-            using var client = HttpFactory.CreateClient();
-            using var response = await client.SendAsync(request);
-            if (response.IsSuccessStatusCode)
-            {
-                ret.Success = true;
-                return ret;
-            }
-            else
-            {
-                string responseStr = await response.Content.ReadAsStringAsync();
-                Log.LogError("Http response error when updating challonge match. Status: {} Content: '{}'", response.StatusCode, responseStr);
-                ret.Success = false;
-                ret.Errors.Add($"Http response error when updating challonge match. Status {response.StatusCode} ({(int)response.StatusCode}). See logs.");
-                return ret;
-            }
-
         }
 
 
@@ -426,32 +356,41 @@ namespace Scorebini.Data
 
 
         const string SmashggEndpoint = @"https://api.start.gg/gql/alpha";
+        /// <summary>
+        /// Not sure if this is structured correctly
+        /// </summary>
+        public class SmashggErrorResponse
+        {
+            [JsonProperty("success")]
+            public bool? Success { get; set; }
+            [JsonProperty("fields")]
+            public IList<string> Fields { get; set; } = null;
+            [JsonProperty("message")]
+            public string Message { get; set; }
+            [JsonProperty("errorId")]
+            public string ErrorId { get; set; }
+        }
+
         public class SmashggPostResponse
         {
             public class DataResponse
             {
+                /// <summary>
+                /// Only valid for the query
+                /// </summary>
                 [JsonProperty("event")]
                 public Smash.gg.Event Event { get; set; }
-            }
-
-
-            /// <summary>
-            /// Not sure if this is structured correctly
-            /// </summary>
-            public class ErrorResponse
-            {
-                [JsonProperty("success")]
-                public bool? Success { get; set; }
-                [JsonProperty("fields")]
-                public IList<string> Fields { get; set; } = null;
-                [JsonProperty("message")]
-                public string Message { get; set; }
-                [JsonProperty("errorId")]
-                public string ErrorId { get; set; }
+                /// <summary>
+                /// Only valid for the mutation
+                /// </summary>
+                [JsonProperty("reportBracketSet")]
+                public List<Smash.gg.Set> Sets { get; set; }
             }
 
             [JsonProperty("data")]
             public DataResponse Data { get; set; } = null;
+            [JsonProperty("errors")]
+            public List<SmashggErrorResponse> Errors { get; set; } = new();
             public List<string> RequestErrors = new();
         }
 
@@ -494,8 +433,8 @@ namespace Scorebini.Data
             queryObject.Variables = new()
             {
                 { "slug", tournamentId },
-                { "setPage", page.ToString() },
-                { "setsPerPage", 98.ToString() }
+                { "setPage", page },
+                { "setsPerPage", 98 }
             };
 
             Log.LogInformation("Querying smash.gg with params: ${Params}", queryObject.Variables);
@@ -504,15 +443,30 @@ namespace Scorebini.Data
             using var client = HttpFactory.CreateClient();
             using var response = await client.SendAsync(request);
             string responseStr = await response.Content.ReadAsStringAsync();
+            SmashggPostResponse deserializedResponse = JsonConvert.DeserializeObject<SmashggPostResponse>(responseStr);
+            if (deserializedResponse == null)
+            {
+                ret.RequestErrors.Add("Could not deserialize smashgg response. See logs for more details.");
+                Log.LogError("Could not deserialize smashgg response with success status code {}. Content: \"{}\"", response.StatusCode, responseStr);
+                deserializedResponse = new();
+            }
+            if (deserializedResponse.Errors?.Count > 0)
+            {
+                Log.LogError("Startgg response error. Status: {} , Content: \"{}\"", response.StatusCode, responseStr);
+                foreach (var item in deserializedResponse.Errors)
+                {
+                    if (!string.IsNullOrEmpty(item?.Message))
+                    {
+                        ret.RequestErrors.Add($"Smashgg error: {item.Message}");
+                    }
+                    else
+                    {
+                        ret.RequestErrors.Add("Unspecified Smashgg error. See logs for more.");
+                    }
+                }
+            }
             if (response.IsSuccessStatusCode)
             {
-                SmashggPostResponse deserializedResponse = JsonConvert.DeserializeObject<SmashggPostResponse>(responseStr);
-                if (deserializedResponse == null)
-                {
-                    ret.RequestErrors.Add("Could not deserialize smashgg response. See logs for more details.");
-                    Log.LogError("Could not deserialize smashgg response with success statuc code {}. Content: \"{}\"", response.StatusCode, responseStr);
-                    return ret;
-                }
                 ret.Data = deserializedResponse.Data;
                 if (ret.Data == null)
                 {
@@ -525,26 +479,120 @@ namespace Scorebini.Data
             else
             {
                 ret.Data = null;
-                Log.LogError("Http response error. Status: {} , Content: \"{}\"", response.StatusCode, responseStr);
-                SmashggPostResponse.ErrorResponse errorResponse = JsonConvert.DeserializeObject<SmashggPostResponse.ErrorResponse>(responseStr);
-                if (errorResponse != null)
-                {
-                    if (!string.IsNullOrEmpty(errorResponse.Message))
-                    {
-                        ret.RequestErrors.Add($"Smashgg error: {errorResponse.Message}");
-                    }
-                    else
-                    {
-                        ret.RequestErrors.Add("Unspecified Smashgg error. See logs for more.");
-                    }
-                }
-                else
+                Log.LogError("Http response error. Status: {} , Content: \"{}\"", (int)response.StatusCode, responseStr);
+                if(ret.RequestErrors.Count == 0)
                 {
                     ret.RequestErrors.Add("Unspecified Smashgg error. See logs for more.");
                 }
                 return ret;
             }
 
+        }
+
+
+
+        /// <summary>
+        /// </summary>
+        /// <param name="report"></param>
+        /// <returns></returns>
+        public async Task<PushScoreResponse> PushSmashggScore(MatchScoreReport report)
+        {
+            PushScoreResponse ret = new PushScoreResponse();
+            ret.Success = false;
+            Log.LogDebug("Updating Smashgg match {}", report.Match?.Id);
+            if (report.Scores.Count != 2)
+            {
+                ret.Success = false;
+                ret.Errors.Add($"Score report had incorrect number of scores. Expected 2, got {report.Scores.Count}.");
+                return ret;
+            }
+
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"{SmashggEndpoint}");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", SBSettingsService.CurrentSettings.SmashggApiKey);
+            Smash.gg.SmashGraphQLQuery queryObject = new();
+            queryObject.Query = Smash.gg.ReportScoreMutation.FullQuery;
+            // Due to the way smashgg accepts scores, we have to do this complicated thing to
+            // synthesize the match order
+            List<Smash.gg.BracketSetGameDataInput> gameData = new();
+            var maxScorePlayer = report.Scores[0];
+            var minScorePlayer = report.Scores[1];
+            if (report.Scores[1].Wins > report.Scores[0].Wins) 
+            {
+                maxScorePlayer = report.Scores[1];
+                minScorePlayer = report.Scores[0];
+            }
+
+            int gameNum = 1;
+            for (int i = 0; i < minScorePlayer.Wins; i++)
+            {
+                gameData.Add(new Smash.gg.BracketSetGameDataInput()
+                {
+                    WinnerId = minScorePlayer.Player.Id,
+                    GameNum = gameNum++,
+                });
+            }
+            for (int i = 0; i < maxScorePlayer.Wins; i++)
+            {
+                gameData.Add(new Smash.gg.BracketSetGameDataInput()
+                {
+                    WinnerId = maxScorePlayer.Player.Id,
+                    GameNum = gameNum++,
+                });
+            }
+
+            queryObject.Variables = new()
+            {
+                { "setId", report.Match.Id },
+                { "winnerId", maxScorePlayer.Player.Id },
+                { "gameData", gameData }
+            };
+
+            Log.LogInformation("Mutating smash.gg with params: ${Params}", queryObject.Variables);
+            request.Content = new StringContent(JsonConvert.SerializeObject(queryObject), System.Text.Encoding.UTF8, "application/json");
+            Log.LogTrace("Mutation request content: {}", JsonConvert.SerializeObject(queryObject));
+
+
+            using var client = HttpFactory.CreateClient();
+            using var response = await client.SendAsync(request);
+            string responseStr = await response.Content.ReadAsStringAsync();
+            Log.LogTrace("Mutation reponse content: {}", responseStr);
+            SmashggPostResponse deserializedResponse = JsonConvert.DeserializeObject<SmashggPostResponse>(responseStr);
+            if (deserializedResponse == null)
+            {
+                ret.Errors.Add("Could not deserialize smashgg response. See logs for more details.");
+                Log.LogError("Could not deserialize smashgg response with success status code {}. Content: \"{}\"", response.StatusCode, responseStr);
+                deserializedResponse = new();
+            }
+            if (deserializedResponse.Errors?.Count > 0)
+            {
+                Log.LogError("Startgg response error. Status: {} , Content: \"{}\"", response.StatusCode, responseStr);
+                foreach (var item in deserializedResponse.Errors)
+                {
+                    if (!string.IsNullOrEmpty(item?.Message))
+                    {
+                        ret.Errors.Add($"Smashgg error: {item.Message}");
+                    }
+                    else
+                    {
+                        ret.Errors.Add("Unspecified Smashgg error. See logs for more.");
+                    }
+                }
+            }
+            if (response.IsSuccessStatusCode)
+            {
+                ret.Success = (ret.Errors.Count == 0);
+                return ret;
+            }
+            else
+            {
+                Log.LogError("Http response error. Status: {} , Content: \"{}\"", (int)response.StatusCode, responseStr);
+                ret.Success = false;
+                if (ret.Errors.Count == 0)
+                {
+                    ret.Errors.Add("Unspecified Smashgg error. See logs for details.");
+                }
+                return ret;
+            }
         }
 
     }

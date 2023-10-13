@@ -96,6 +96,14 @@ namespace Scorebini.Data.Smash.gg
         public List<Set> Nodes { get; set; }
     }
 
+    public class BracketSetGameDataInput
+    {
+        [JsonProperty("winnerId")]
+        public StringOrIntId WinnerId { get; set; }
+        [JsonProperty("gameNum")]
+        public int GameNum { get; set; }
+        // We don't have enough info to fill the other fields out
+    }
 
     
     public class SmashGraphQLQuery
@@ -111,7 +119,7 @@ namespace Scorebini.Data.Smash.gg
         /// Not required unless you have variables in the query string
         /// </summary>
         [JsonProperty("variables")]
-        public Dictionary<string, string> Variables { get; set; } = new();
+        public Dictionary<string, object> Variables { get; set; } = new();
     }
 
 
@@ -143,6 +151,17 @@ query EventQuery($slug: String, $setPage: Int, $setsPerPage: Int) {
         }
       }
     }
+  }
+}";
+    }
+
+    public static class ReportScoreMutation
+    {
+        public static string FullQuery = @"
+mutation reportSet($setId: ID!, $winnerId: ID!, $gameData: [BracketSetGameDataInput]) {
+  reportBracketSet(setId: $setId, winnerId: $winnerId, gameData: $gameData) {
+    id
+    state
   }
 }";
     }

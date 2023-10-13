@@ -119,7 +119,7 @@
 
     bool _isUpdatingContext = false;
     bool DisableUpdateButton => string.IsNullOrWhiteSpace(InputState.Url) || _isUpdatingContext;
-    bool CanPushScore => (InputState.MatchId.HasValue == true) && (Tournament?.Model?.TournamentHost == TournamentHost.Challonge) && (Tournament?.IsValidMatchId(InputState.MatchId) == true);
+    bool CanPushScore => (InputState.MatchId.HasValue == true) && (Tournament?.IsValidMatchId(InputState.MatchId) == true);
 
     List<string> ContextUpdateErrors = null;
     List<string> PushScoreErrors = null;
